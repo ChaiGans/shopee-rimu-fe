@@ -18,6 +18,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "../ui/use-toast";
 import Cookies from "js-cookie";
 import { LoginResponse } from "@/types/LoginResponse";
+import { redirect } from "react-router-dom";
 
 const loginFormSchema = z.object({
   shop_id: z.string().min(6, {
@@ -74,6 +75,8 @@ const LoginForm = () => {
         secure: true,
         sameSite: "strict",
       });
+
+      return redirect("/");
     } catch (error) {
       console.error("Login Error:", error);
       setErrorMessage("Failed to login. Please check your credentials.");
@@ -81,8 +84,8 @@ const LoginForm = () => {
   }
 
   return (
-    <div className="font-sans">
-      <div className="relative min-h-screen flex flex-col sm:justify-center items-center bg-gray-100">
+    <div className="font-sans flex min-h-screen items-center justify-center">
+      <div className="relative min-h-screen flex flex-col justify-center items-center ">
         <div className="relative sm:max-w-sm w-full">
           <div className="card bg-blue-400 shadow-lg w-full h-full rounded-3xl absolute transform -rotate-6"></div>
           <div className="card bg-red-400 shadow-lg w-full h-full rounded-3xl absolute transform rotate-6"></div>
