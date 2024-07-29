@@ -57,12 +57,19 @@ const LoginForm = () => {
       });
       console.log("Login Success:", response);
       const expiresDays = (response.data?.expire_in || 1 / 24) / (60 * 60 * 24);
-      Cookies.set("accessToken", response.data?.access_token, {
+
+      // Create JWT tokens
+      const accessToken = response.data?.access_token || "";
+      const shopIdToken = response.data?.shop_id || "";
+
+      // Set cookies
+      Cookies.set("accessToken", accessToken, {
         expires: expiresDays,
         secure: true,
         sameSite: "strict",
       });
-      Cookies.set("shopId", response.data?.shop_id, {
+
+      Cookies.set("shopId", shopIdToken, {
         expires: 7,
         secure: true,
         sameSite: "strict",

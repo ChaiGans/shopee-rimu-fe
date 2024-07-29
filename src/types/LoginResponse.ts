@@ -8,5 +8,5 @@ export interface LoginResponse {
 interface LoginResponseData {
   access_token: string;
   expire_in: number;
-  shop_id: number;
+  shop_id: string;
 }
