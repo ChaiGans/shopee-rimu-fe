@@ -23,9 +23,9 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
+import { registerUser } from "@/services/registerService";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
-import { loginShop } from "@/services/loginService";
 
 const formSchema = z.object({
   username: z.string().min(2, {
@@ -55,14 +55,15 @@ export default function RegisterForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await loginShop({
+      await registerUser({
         username: values.username,
         password: values.password,
+        role: "general",
       });
 
       toast({
-        title: "Login Success",
-        description: `User with username ${values.username} successfully login.`,
+        title: "Register Success",
+        description: `User with username ${values.username} successfully registered.`,
         variant: "success",
       });
 
@@ -71,8 +72,8 @@ export default function RegisterForm() {
       console.error("Login Error:", error);
 
       toast({
-        title: "Login Failed",
-        description: `"Failed to login. Check your credentials."`,
+        title: "Register Failed",
+        description: "Failed to register. Contact support for help.",
         variant: "destructive",
       });
     }
@@ -83,11 +84,9 @@ export default function RegisterForm() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-orange-600">
-            Login
+            Register
           </CardTitle>
-          <CardDescription>
-            Login to your account to get started.
-          </CardDescription>
+          <CardDescription>Create your account to get started.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -147,16 +146,16 @@ export default function RegisterForm() {
                 type="submit"
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white"
               >
-                Login
+                Register
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="justify-center">
           <p className="text-sm text-gray-600">
-            Do not have an account?{" "}
-            <a href="/register" className="text-orange-600 hover:underline">
-              Register here
+            Already have an account?{" "}
+            <a href="/login" className="text-orange-600 hover:underline">
+              Login here
             </a>
           </p>
         </CardFooter>
