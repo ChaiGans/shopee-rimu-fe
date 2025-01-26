@@ -7,6 +7,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
 api.interceptors.response.use(
@@ -20,33 +21,6 @@ api.interceptors.response.use(
       !originalRequest._retry
     ) {
       originalRequest._retry = true;
-
-      // Try to refresh the access token
-      try {
-        const refreshTokenResponse = await axios.post(
-          "/api/auth/refresh-token",
-          null,
-          { withCredentials: true }
-        );
-
-        // Extract the new access token and its expiration time
-        const newAccessToken = refreshTokenResponse.data.accessToken;
-        const expiresIn = refreshTokenResponse.data.expires_in;
-
-        // Set the new access token in the cookie
-        Cookies.set("accessToken", newAccessToken, {
-          maxAge: expiresIn,
-          path: "/",
-        });
-
-        // Retry the original request with the new access token
-        return api(originalRequest);
-      } catch (refreshError) {
-        // Handle refresh token expiration (e.g., log out the user)
-        console.error("Refresh token expired. Please log in again.");
-        // Perform logout or redirect to login page
-        return Promise.reject(refreshError);
-      }
     }
 
     return Promise.reject(error);

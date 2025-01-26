@@ -1,15 +1,15 @@
 // src/services/shopService.ts
 import api from "../api/axios";
-import { LoginResponse } from "@/types/LoginResponse";
+import { LoginResponseData } from "@/types/LoginResponse";
 import { LoginRequest } from "@/types/LoginRequest";
 
 // Function to fetch users
 export const loginShop = async (
   credentials: LoginRequest
-): Promise<LoginResponse> => {
-  const response = await api.post<LoginResponse>("/api/auth/login", {
-    shop_id: credentials.shop_id,
-    shop_code: credentials.shop_code,
+): Promise<LoginResponseData> => {
+  const response = await api.post<LoginResponseData>("/api/auth/login", {
+    username: credentials.username,
+    password: credentials.password,
   });
   return response.data;
 };

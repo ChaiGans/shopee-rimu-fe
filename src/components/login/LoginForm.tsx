@@ -16,15 +16,14 @@ import {
 import { loginShop } from "@/services/loginService";
 import { useState, useEffect } from "react";
 import { useToast } from "../ui/use-toast";
-import Cookies from "js-cookie";
-import { LoginResponse } from "@/types/LoginResponse";
 import { redirect } from "react-router-dom";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 const loginFormSchema = z.object({
-  shop_id: z.string().min(6, {
+  username: z.string().min(6, {
     message: "Shop ID must be at least 6 numbers.",
   }),
-  shop_code: z.string().min(10, {
+  password: z.string().min(10, {
     message: "Shop Code must be filled.",
   }),
 });
@@ -32,11 +31,12 @@ const loginFormSchema = z.object({
 const LoginForm = () => {
   const { toast } = useToast();
   const [errorMessage, setErrorMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      shop_id: "",
-      shop_code: "",
+      username: "",
+      password: "",
     },
   });
 
@@ -52,28 +52,15 @@ const LoginForm = () => {
 
   async function onSubmit(values: z.infer<typeof loginFormSchema>) {
     try {
-      const response: LoginResponse = await loginShop({
-        shop_id: values.shop_id,
-        shop_code: values.shop_code,
-      });
-      console.log("Login Success:", response);
-      const expiresDays = (response.data?.expire_in || 1 / 24) / (60 * 60 * 24);
-
-      // Create JWT tokens
-      const accessToken = response.data?.access_token || "";
-      const shopIdToken = response.data?.shop_id || "";
-
-      // Set cookies
-      Cookies.set("accessToken", accessToken, {
-        expires: expiresDays,
-        secure: true,
-        sameSite: "strict",
+      await loginShop({
+        username: values.username,
+        password: values.password,
       });
 
-      Cookies.set("shopId", shopIdToken, {
-        expires: 7,
-        secure: true,
-        sameSite: "strict",
+      toast({
+        title: "Login Success",
+        description: `User with username ${values.username} successfully login.`,
+        variant: "success",
       });
 
       return redirect("/");
@@ -81,6 +68,10 @@ const LoginForm = () => {
       console.error("Login Error:", error);
       setErrorMessage("Failed to login. Please check your credentials.");
     }
+  }
+
+  function handleEyeClick() {
+    setShowPassword(!showPassword);
   }
 
   return (
@@ -101,15 +92,15 @@ const LoginForm = () => {
                 <div>
                   <FormField
                     control={loginForm.control}
-                    name="shop_id"
+                    name="username"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="block mt-3 text-sm text-gray-700 text-start font-semibold">
-                          Shop ID <span className="text-red-700">*)</span>
+                          Username <span className="text-red-700">*)</span>
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Shop ID"
+                            placeholder="username"
                             className="mt-1 block w-full border-none bg-gray-100 h-11 rounded-xl shadow-lg hover:bg-blue-100 focus:bg-blue-100 focus:ring-0"
                             required
                             {...field}
@@ -124,23 +115,36 @@ const LoginForm = () => {
                 <div className="mt-7">
                   <FormField
                     control={loginForm.control}
-                    name="shop_code"
+                    name="password"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="block mt-3 text-sm text-gray-700 text-start font-semibold">
-                          Shop Code <span className="text-red-700">*)</span>
+                          Password <span className="text-red-700">*)</span>
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Shop Code"
-                            className="mt-1 block w-full border-none bg-gray-100 h-11 rounded-xl shadow-lg hover:bg-blue-100 focus:bg-blue-100 focus:ring-0"
-                            required
-                            {...field}
-                          />
+                          <div className="flex flex-row justify-between items-center">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="password"
+                              className="mt-1 block w-full border-none bg-gray-100 h-11 rounded-xl shadow-lg hover:bg-blue-100 focus:bg-blue-100 focus:ring-0"
+                              required
+                              {...field}
+                            />
+                            {showPassword ? (
+                              <FaEye
+                                className="absolute right-12"
+                                onClick={handleEyeClick}
+                              />
+                            ) : (
+                              <FaEyeSlash
+                                className="absolute right-12"
+                                onClick={handleEyeClick}
+                              />
+                            )}
+                          </div>
                         </FormControl>
                         <FormDescription>
-                          WARNING: Do not let anyone know your shop code.
+                          WARNING: Do not let anyone know your password.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
