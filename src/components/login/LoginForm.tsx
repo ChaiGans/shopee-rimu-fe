@@ -26,7 +26,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { loginShop } from "@/services/loginService";
-import { useAuth } from "../hooks/useAuth";
+import { AuthContextType } from "@/types/AuthContextType";
 
 const formSchema = z.object({
   username: z.string().min(2, {
@@ -37,7 +37,11 @@ const formSchema = z.object({
   }),
 });
 
-export default function RegisterForm() {
+interface RegisterFormProps {
+  authProps: AuthContextType | undefined;
+}
+
+const RegisterForm: React.FC<RegisterFormProps> = ({ authProps }) => {
   const { toast } = useToast();
 
   const navigate = useNavigate();
@@ -80,8 +84,6 @@ export default function RegisterForm() {
       });
     }
   }
-
-  const authProps = useAuth();
 
   return (
     <div className="flex justify-center items-center min-h-[90vh] bg-orange-50">
@@ -168,4 +170,6 @@ export default function RegisterForm() {
       </Card>
     </div>
   );
-}
+};
+
+export default RegisterForm;
