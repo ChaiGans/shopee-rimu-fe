@@ -1,6 +1,5 @@
 // src/api/axios.ts
 import axios from "axios";
-import Cookies from "js-cookie";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -18,7 +17,7 @@ api.interceptors.response.use(
     if (
       error.response &&
       error.response.status === 401 &&
-      !originalRequest._retry
+      !originalRequest._retry 
     ) {
       originalRequest._retry = true;
     }

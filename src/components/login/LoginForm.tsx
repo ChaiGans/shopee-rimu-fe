@@ -26,6 +26,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { loginShop } from "@/services/loginService";
+import { useAuth } from "../hooks/useAuth";
 
 const formSchema = z.object({
   username: z.string().min(2, {
@@ -66,7 +67,9 @@ export default function RegisterForm() {
         variant: "success",
       });
 
-      navigate("/login");
+      authProps?.setIsAuthenticated(true);
+
+      navigate("/");
     } catch (error) {
       console.error("Login Error:", error);
 
@@ -77,6 +80,8 @@ export default function RegisterForm() {
       });
     }
   }
+
+  const authProps = useAuth();
 
   return (
     <div className="flex justify-center items-center min-h-[90vh] bg-orange-50">
