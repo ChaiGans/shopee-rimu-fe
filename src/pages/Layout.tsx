@@ -1,18 +1,17 @@
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Outlet } from "react-router-dom";
-import Navbar from "@/components/layout/navbar";
 
-const Layout = () => {
-  // const location = useLocation();
-
-  // const hideLayout = location.pathname === "/login";
-
+export default function Layout() {
   return (
-    <>
-      {/* {!hideLayout && <Navbar />} */}
-      <Navbar />
-      <Outlet />
-    </>
+    <SidebarProvider>
+      <AppSidebar />
+      <main className="w-full">
+        {/* <SidebarTrigger /> */}
+        <div className="">
+          <Outlet />
+        </div>
+      </main>
+    </SidebarProvider>
   );
-};
-
-export default Layout;
+}

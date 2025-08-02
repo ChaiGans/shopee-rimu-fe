@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Register from "./pages/Register";
+import HPP from "./pages/HPP";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="about" element={<About />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
+          <Route path="hpp" element={<HPP />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
