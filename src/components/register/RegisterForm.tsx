@@ -85,7 +85,7 @@ const RegisterForm: React.FC<RegisterFormProps> = () => {
   }
 
   return (
-    <div className="flex justify-center items-center min-h-[90vh] bg-orange-50">
+    <div className="flex justify-center items-center min-h-screen bg-orange-50">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-orange-600">
