@@ -24,9 +24,10 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { registerUser } from "@/services/registerService";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { AuthContextType } from "@/types/AuthContextType";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 const formSchema = z.object({
   username: z.string().min(2, {
@@ -41,7 +42,7 @@ interface RegisterFormProps {
   authProps: AuthContextType | undefined;
 }
 
-const RegisterForm: React.FC<RegisterFormProps> = () => {
+const RegisterForm: React.FC<RegisterFormProps> = ({ authProps }) => {
   const { toast } = useToast();
 
   const navigate = useNavigate();
@@ -72,13 +73,17 @@ const RegisterForm: React.FC<RegisterFormProps> = () => {
         variant: "success",
       });
 
-      navigate("/login");
+      authProps?.setIsAuthenticated(true);
+      navigate("/");
     } catch (error) {
       console.error("Login Error:", error);
 
       toast({
         title: "Register Failed",
-        description: "Failed to register. Contact support for help.",
+        description: getApiErrorMessage(
+          error,
+          "Failed to register. Contact support for help."
+        ),
         variant: "destructive",
       });
     }
@@ -150,8 +155,9 @@ const RegisterForm: React.FC<RegisterFormProps> = () => {
               <Button
                 type="submit"
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                disabled={form.formState.isSubmitting}
               >
-                Register
+                {form.formState.isSubmitting ? "Registering..." : "Register"}
               </Button>
             </form>
           </Form>
@@ -159,9 +165,9 @@ const RegisterForm: React.FC<RegisterFormProps> = () => {
         <CardFooter className="justify-center">
           <p className="text-sm text-gray-600">
             Already have an account?{" "}
-            <a href="/login" className="text-orange-600 hover:underline">
+            <Link to="/login" className="text-orange-600 hover:underline">
               Login here
-            </a>
+            </Link>
           </p>
         </CardFooter>
       </Card>

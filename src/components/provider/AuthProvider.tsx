@@ -23,11 +23,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const response = await getSelfInformation();
         if (isMounted) {
           setIsAuthenticated(true);
-          setUser(response?.payload || null);
+          setUser(response?.data || null);
         }
       } catch (error) {
         if (isMounted) {
           setIsAuthenticated(false);
+          setUser(null);
           console.error("Failed to fetch user information:", error);
         }
       } finally {

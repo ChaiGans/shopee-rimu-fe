@@ -1,4 +1,4 @@
 export interface ApiResponse<T = unknown> {
-  payload?: T;
+  data: T;
   message: string;
 }

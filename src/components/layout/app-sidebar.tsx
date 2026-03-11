@@ -13,11 +13,10 @@ import { useToast } from "../ui/use-toast";
 import {
   Home as HomeIcon,
   Info,
-  FileText,
   LogOut,
   LogIn,
   UserPlus,
-  BotIcon,
+  Truck,
 } from "lucide-react";
 
 export function AppSidebar() {
@@ -47,10 +46,21 @@ export function AppSidebar() {
   const isActive = (path: string) => location.pathname === path;
 
   const navLinks = [
-    { path: "/", label: "Home", icon: HomeIcon },
-    { path: "/about", label: "About", icon: Info },
-    { path: "/hpp", label: "HPP", icon: FileText },
-    { path: "/nett-profit-generator", label: "NPG", icon: BotIcon },
+    { path: "/", label: "Home", icon: HomeIcon, authOnly: false },
+    { path: "/about", label: "About", icon: Info, authOnly: false },
+    // { path: "/hpp", label: "HPP", icon: FileText, authOnly: true },
+    // {
+    //   path: "/nett-profit-generator",
+    //   label: "NPG",
+    //   icon: BotIcon,
+    //   authOnly: true,
+    // },
+    {
+      path: "/auto-shipping-config",
+      label: "Auto Shipping Config",
+      icon: Truck,
+      authOnly: true,
+    },
   ];
 
   const authLinks = [
@@ -66,7 +76,9 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          {navLinks.map(({ path, label, icon: Icon }) => (
+          {navLinks
+            .filter((link) => !link.authOnly || authProps?.isAuthenticated)
+            .map(({ path, label, icon: Icon }) => (
             <Link to={path} key={path} className="w-full">
               <Button
                 variant={isActive(path) ? "default" : "ghost"}
@@ -75,7 +87,7 @@ export function AppSidebar() {
                 <Icon className="mr-2 h-4 w-4" /> {label}
               </Button>
             </Link>
-          ))}
+            ))}
         </SidebarGroup>
       </SidebarContent>
 

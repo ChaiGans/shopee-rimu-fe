@@ -23,10 +23,11 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { loginShop } from "@/services/loginService";
 import { AuthContextType } from "@/types/AuthContextType";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 const formSchema = z.object({
   username: z.string().min(2, {
@@ -37,11 +38,11 @@ const formSchema = z.object({
   }),
 });
 
-interface RegisterFormProps {
+interface LoginFormProps {
   authProps: AuthContextType | undefined;
 }
 
-const RegisterForm: React.FC<RegisterFormProps> = ({ authProps }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ authProps }) => {
   const { toast } = useToast();
 
   const navigate = useNavigate();
@@ -79,7 +80,10 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ authProps }) => {
 
       toast({
         title: "Login Failed",
-        description: `"Failed to login. Check your credentials."`,
+        description: getApiErrorMessage(
+          error,
+          "Failed to login. Check your credentials."
+        ),
         variant: "destructive",
       });
     }
@@ -153,8 +157,9 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ authProps }) => {
               <Button
                 type="submit"
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                disabled={form.formState.isSubmitting}
               >
-                Login
+                {form.formState.isSubmitting ? "Logging in..." : "Login"}
               </Button>
             </form>
           </Form>
@@ -162,9 +167,9 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ authProps }) => {
         <CardFooter className="justify-center">
           <p className="text-sm text-gray-600">
             Do not have an account?{" "}
-            <a href="/register" className="text-orange-600 hover:underline">
+            <Link to="/register" className="text-orange-600 hover:underline">
               Register here
-            </a>
+            </Link>
           </p>
         </CardFooter>
       </Card>
@@ -172,4 +177,4 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ authProps }) => {
   );
 };
 
-export default RegisterForm;
+export default LoginForm;
