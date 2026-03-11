@@ -4,7 +4,12 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../hooks/useAuth";
@@ -13,11 +18,26 @@ import { useToast } from "../ui/use-toast";
 import {
   Home as HomeIcon,
   Info,
+  Package,
+  Warehouse,
   LogOut,
   LogIn,
   UserPlus,
   Truck,
+  type LucideIcon,
 } from "lucide-react";
+
+type NavItem = {
+  path: string;
+  label: string;
+  icon: LucideIcon;
+  authOnly?: boolean;
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
 
 export function AppSidebar() {
   const authProps = useAuth();
@@ -43,23 +63,49 @@ export function AppSidebar() {
     }
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`);
 
-  const navLinks = [
-    { path: "/", label: "Home", icon: HomeIcon, authOnly: false },
-    { path: "/about", label: "About", icon: Info, authOnly: false },
-    // { path: "/hpp", label: "HPP", icon: FileText, authOnly: true },
-    // {
-    //   path: "/nett-profit-generator",
-    //   label: "NPG",
-    //   icon: BotIcon,
-    //   authOnly: true,
-    // },
+  const navGroups: NavGroup[] = [
     {
-      path: "/auto-shipping-config",
-      label: "Auto Shipping Config",
-      icon: Truck,
-      authOnly: true,
+      label: "General",
+      items: [
+        { path: "/", label: "Home", icon: HomeIcon, authOnly: false },
+        { path: "/about", label: "About", icon: Info, authOnly: false },
+      ],
+    },
+    {
+      label: "Logistics",
+      items: [
+        {
+          path: "/auto-shipping-config",
+          label: "Auto Shipping Config",
+          icon: Truck,
+          authOnly: true,
+        },
+      ],
+    },
+    {
+      label: "Warehouse",
+      items: [
+        {
+          path: "/warehouse/perhitungan-selisih",
+          label: "Perhitungan Selisih",
+          icon: Warehouse,
+          authOnly: false,
+        },
+      ],
+    },
+    {
+      label: "Utilities",
+      items: [
+        {
+          path: "/utilities/hpp",
+          label: "HPP",
+          icon: Package,
+          authOnly: true,
+        },
+      ],
     },
   ];
 
@@ -70,28 +116,45 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader>
+      <SidebarHeader className="bg-white">
         <div className="text-2xl font-bold px-4 py-2">Rimu</div>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          {navLinks
-            .filter((link) => !link.authOnly || authProps?.isAuthenticated)
-            .map(({ path, label, icon: Icon }) => (
-            <Link to={path} key={path} className="w-full">
-              <Button
-                variant={isActive(path) ? "default" : "ghost"}
-                className="w-full justify-start"
-              >
-                <Icon className="mr-2 h-4 w-4" /> {label}
-              </Button>
-            </Link>
-            ))}
-        </SidebarGroup>
+      <SidebarContent className="bg-white">
+        {navGroups.map((group) => {
+          const visibleItems = group.items.filter(
+            (item) => !item.authOnly || authProps?.isAuthenticated,
+          );
+
+          if (visibleItems.length === 0) {
+            return null;
+          }
+
+          return (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {visibleItems.map(({ path, label, icon: Icon }) => (
+                    <SidebarMenuItem key={path}>
+                      <SidebarMenuButton asChild isActive={isActive(path)}>
+                        <Link to={path}>
+                          <Icon />
+                          <span>{label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
+
+       
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="bg-white">
         {authProps?.isAuthenticated ? (
           <Button
             onClick={handleLogout}

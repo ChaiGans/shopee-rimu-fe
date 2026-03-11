@@ -9,6 +9,7 @@ import HPP from "./pages/HPP";
 import ProtectedRouteProvider from "./components/provider/ProtectedRouteProvider";
 import NettProfitGenerator from "./pages/NettProfitGenerator";
 import AutoShippingConfig from "./pages/AutoShippingConfig";
+import WarehousePerhitunganSelisih from "./pages/WarehousePerhitunganSelisih";
 
 function App() {
   return (
@@ -44,6 +45,10 @@ function App() {
                 <AutoShippingConfig />
               </ProtectedRouteProvider>
             }
+          />
+          <Route
+            path="warehouse/perhitungan-selisih"
+            element={<WarehousePerhitunganSelisih />}
           />
 
           <Route path="*" element={<NotFound />} />
