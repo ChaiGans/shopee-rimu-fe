@@ -6,7 +6,7 @@ export interface RegisterRequest {
   role: string;
 }
 
-interface RegisterResponseData {
+export interface RegisterResponseData {
   jwt_token: string;
 }
 
