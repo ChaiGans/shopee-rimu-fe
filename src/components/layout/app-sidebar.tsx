@@ -24,6 +24,7 @@ import {
   LogIn,
   UserPlus,
   Truck,
+  WashingMachine,
   type LucideIcon,
 } from "lucide-react";
 
@@ -78,7 +79,7 @@ export function AppSidebar() {
       label: "Logistics",
       items: [
         {
-          path: "/auto-shipping-config",
+          path: "/logistics/auto-shipping-config",
           label: "Auto Shipping Config",
           icon: Truck,
           authOnly: true,
@@ -103,6 +104,12 @@ export function AppSidebar() {
           path: "/utilities/hpp",
           label: "HPP",
           icon: Package,
+          authOnly: true,
+        },
+        {
+          path: "/utilities/nett-profit-generator",
+          label: "Nett Profit Generator",
+          icon: WashingMachine,
           authOnly: true,
         },
       ],
@@ -150,8 +157,6 @@ export function AppSidebar() {
             </SidebarGroup>
           );
         })}
-
-       
       </SidebarContent>
 
       <SidebarFooter className="bg-white">

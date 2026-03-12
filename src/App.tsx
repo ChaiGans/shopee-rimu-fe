@@ -19,11 +19,18 @@ function App() {
         <Route path="/register" element={<Register />} />
 
         <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
+          <Route
+            index
+            element={
+              <ProtectedRouteProvider>
+                <Home />
+              </ProtectedRouteProvider>
+            }
+          />
           <Route path="about" element={<About />} />
 
           <Route
-            path="hpp"
+            path="utilities/hpp"
             element={
               <ProtectedRouteProvider>
                 <HPP />
@@ -31,7 +38,7 @@ function App() {
             }
           />
           <Route
-            path="nett-profit-generator"
+            path="utilities/nett-profit-generator"
             element={
               <ProtectedRouteProvider>
                 <NettProfitGenerator />
@@ -39,7 +46,7 @@ function App() {
             }
           />
           <Route
-            path="auto-shipping-config"
+            path="logistics/auto-shipping-config"
             element={
               <ProtectedRouteProvider>
                 <AutoShippingConfig />
