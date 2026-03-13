@@ -13,7 +13,6 @@ export const getMarketplaceProducts = async (
   params: GetMarketplaceProductsParams,
 ): Promise<ProductListData> => {
   const searchParams = new URLSearchParams();
-  searchParams.set("shop_id", params.shopId.toString());
   searchParams.set("page", params.page.toString());
   searchParams.set("size", params.size.toString());
 
@@ -22,7 +21,7 @@ export const getMarketplaceProducts = async (
   });
 
   const response = await api.get<ApiResponse<ProductListData>>(
-    `/api/marketplace/product/list?${searchParams.toString()}`,
+    `/api/marketplace/product/${params.shopId.toString()}/list?${searchParams.toString()}`,
   );
   return response.data.data;
 };
