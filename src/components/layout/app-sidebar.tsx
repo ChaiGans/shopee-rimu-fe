@@ -25,6 +25,7 @@ import {
   UserPlus,
   Truck,
   WashingMachine,
+  Boxes,
   type LucideIcon,
 } from "lucide-react";
 
@@ -94,6 +95,12 @@ export function AppSidebar() {
           label: "Perhitungan Selisih",
           icon: Warehouse,
           authOnly: false,
+        },
+        {
+          path: "/warehouse/products",
+          label: "Products",
+          icon: Boxes,
+          authOnly: true,
         },
       ],
     },

@@ -10,6 +10,7 @@ import ProtectedRouteProvider from "./components/provider/ProtectedRouteProvider
 import NettProfitGenerator from "./pages/NettProfitGenerator";
 import AutoShippingConfig from "./pages/AutoShippingConfig";
 import WarehousePerhitunganSelisih from "./pages/WarehousePerhitunganSelisih";
+import WarehouseProducts from "./pages/WarehouseProducts";
 
 function App() {
   return (
@@ -56,6 +57,14 @@ function App() {
           <Route
             path="warehouse/perhitungan-selisih"
             element={<WarehousePerhitunganSelisih />}
+          />
+          <Route
+            path="warehouse/products"
+            element={
+              <ProtectedRouteProvider>
+                <WarehouseProducts />
+              </ProtectedRouteProvider>
+            }
           />
 
           <Route path="*" element={<NotFound />} />

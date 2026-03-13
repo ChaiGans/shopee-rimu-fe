@@ -7,6 +7,7 @@ const pageTitleMap: Record<string, string> = {
   "/about": "About",
   "/auto-shipping-config": "Auto Shipping Config",
   "/warehouse/perhitungan-selisih": "Perhitungan Selisih",
+  "/warehouse/products": "Products",
   "/hpp": "HPP",
 };
 
