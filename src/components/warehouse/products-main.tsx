@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import Loading from "@/components/loading";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { getMarketplaceProducts } from "@/services/productService";
 import { getShops } from "@/services/shopService";
-import { ProductItem, ProductListData, ProductStatus } from "@/types/Product";
+import { ProductItem, ProductListData, ProductModel, ProductStatus } from "@/types/Product";
 import { Shop } from "@/types/Shop";
 
 const PRODUCT_STATUSES: ProductStatus[] = [
@@ -47,12 +47,80 @@ const resolveShopLabel = (shop: Shop): string => {
 const getPrimaryPriceInfo = (item: ProductItem) =>
   item.price_info && item.price_info.length > 0 ? item.price_info[0] : undefined;
 
+const getPrimaryModelPriceInfo = (model: ProductModel) =>
+  model.price_info && model.price_info.length > 0 ? model.price_info[0] : undefined;
+
 const getTotalAvailableStock = (item: ProductItem): string => {
   const totalAvailable = item.stock_info_v2?.summary_info?.total_available_stock;
   if (typeof totalAvailable === "number") {
     return totalAvailable.toString();
   }
   return "-";
+};
+
+const getModelTotalAvailableStock = (model: ProductModel): string => {
+  const totalAvailable = model.stock_info_v2?.summary_info?.total_available_stock;
+  if (typeof totalAvailable === "number") {
+    return totalAvailable.toString();
+  }
+  return "-";
+};
+
+const getModelVariationLabel = (item: ProductItem, model: ProductModel): string => {
+  const labels = (model.tier_index ?? []).map((index, tierPosition) => {
+    const tier = item.tier_variation?.[tierPosition];
+    const option = tier?.option_list?.[index];
+    if (tier?.name && option) {
+      return `${tier.name}: ${option}`;
+    }
+    if (option) {
+      return option;
+    }
+    return `${tier?.name ?? "Tier"} ${index + 1}`;
+  });
+
+  if (labels.length === 0) {
+    return item.item_name ? `Variant of ${item.item_name}` : "Variant";
+  }
+
+  return labels.join(" / ");
+};
+
+const modelMatchesKeyword = (item: ProductItem, model: ProductModel, keyword: string): boolean => {
+  const modelID = model.model_id.toString();
+  const modelSKU = (model.model_sku ?? "").toLowerCase();
+  const modelStatus = (model.model_status ?? "").toLowerCase();
+  const modelStock = getModelTotalAvailableStock(model).toLowerCase();
+  const modelLabel = getModelVariationLabel(item, model).toLowerCase();
+
+  return (
+    modelID.includes(keyword) ||
+    modelSKU.includes(keyword) ||
+    modelStatus.includes(keyword) ||
+    modelStock.includes(keyword) ||
+    modelLabel.includes(keyword)
+  );
+};
+
+const itemMatchesKeyword = (item: ProductItem, keyword: string): boolean => {
+  const itemID = item.item_id.toString();
+  const itemName = (item.item_name ?? "").toLowerCase();
+  const itemSKU = (item.item_sku ?? "").toLowerCase();
+  const itemStatus = (item.item_status ?? "").toLowerCase();
+  const itemStock = getTotalAvailableStock(item).toLowerCase();
+
+  return (
+    itemID.includes(keyword) ||
+    itemName.includes(keyword) ||
+    itemSKU.includes(keyword) ||
+    itemStatus.includes(keyword) ||
+    itemStock.includes(keyword)
+  );
+};
+
+type FilteredProductTreeItem = {
+  item: ProductItem;
+  visibleModels: ProductModel[];
 };
 
 const formatPrice = (value?: number, currency?: string): string => {
@@ -162,28 +230,31 @@ function WarehouseProductsMain() {
     return Math.ceil(totalCount / pageSize);
   }, [products?.pagination.total_count, pageSize]);
 
-  const filteredItems = useMemo(() => {
+  const filteredItems = useMemo<FilteredProductTreeItem[]>(() => {
     const items = products?.items ?? [];
     const keyword = search.trim().toLowerCase();
     if (!keyword) {
-      return items;
+      return items.map((item) => ({
+        item,
+        visibleModels: item.models ?? [],
+      }));
     }
 
-    return items.filter((item) => {
-      const itemID = item.item_id.toString();
-      const itemName = (item.item_name ?? "").toLowerCase();
-      const itemSKU = (item.item_sku ?? "").toLowerCase();
-      const itemStatus = (item.item_status ?? "").toLowerCase();
-      const itemStock = getTotalAvailableStock(item).toLowerCase();
+    return items
+      .map((item) => {
+        const parentMatched = itemMatchesKeyword(item, keyword);
+        const matchedModels = (item.models ?? []).filter((model) => modelMatchesKeyword(item, model, keyword));
 
-      return (
-        itemID.includes(keyword) ||
-        itemName.includes(keyword) ||
-        itemSKU.includes(keyword) ||
-        itemStatus.includes(keyword) ||
-        itemStock.includes(keyword)
-      );
-    });
+        if (!parentMatched && matchedModels.length === 0) {
+          return null;
+        }
+
+        return {
+          item,
+          visibleModels: parentMatched ? item.models ?? [] : matchedModels,
+        };
+      })
+      .filter((value): value is FilteredProductTreeItem => value !== null);
   }, [products?.items, search]);
 
   const handleShopChange = (shopID: number) => {
@@ -288,7 +359,7 @@ function WarehouseProductsMain() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by item id, name, sku, status, or stock"
+                placeholder="Search by item/model id, name, sku, status, variation, or stock"
                 className="max-w-md"
               />
             </div>
@@ -312,22 +383,44 @@ function WarehouseProductsMain() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.map((item) => {
+                      {filteredItems.map(({ item, visibleModels }) => {
                         const priceInfo = getPrimaryPriceInfo(item);
                         return (
-                          <TableRow key={item.item_id}>
-                            <TableCell>{item.item_id}</TableCell>
-                            <TableCell>{item.item_name || "-"}</TableCell>
-                            <TableCell>{item.item_sku || "-"}</TableCell>
-                            <TableCell>{item.item_status || "-"}</TableCell>
-                            <TableCell>{getTotalAvailableStock(item)}</TableCell>
-                            <TableCell>
-                              {formatPrice(priceInfo?.current_price, priceInfo?.currency)}
-                            </TableCell>
-                            <TableCell>
-                              {formatPrice(priceInfo?.original_price, priceInfo?.currency)}
-                            </TableCell>
-                          </TableRow>
+                          <Fragment key={item.item_id}>
+                            <TableRow className={item.has_model ? "bg-slate-50/70" : undefined}>
+                              <TableCell className="font-medium">{item.item_id}</TableCell>
+                              <TableCell>{item.item_name || "-"}</TableCell>
+                              <TableCell>{item.item_sku || "-"}</TableCell>
+                              <TableCell>{item.item_status || "-"}</TableCell>
+                              <TableCell>{getTotalAvailableStock(item)}</TableCell>
+                              <TableCell>
+                                {formatPrice(priceInfo?.current_price, priceInfo?.currency)}
+                              </TableCell>
+                              <TableCell>
+                                {formatPrice(priceInfo?.original_price, priceInfo?.currency)}
+                              </TableCell>
+                            </TableRow>
+                            {visibleModels.map((model) => {
+                              const modelPriceInfo = getPrimaryModelPriceInfo(model);
+                              return (
+                                <TableRow key={`${item.item_id}-${model.model_id}`} className="bg-white">
+                                  <TableCell className="pl-8 text-slate-600">{model.model_id}</TableCell>
+                                  <TableCell className="pl-8 text-slate-700">
+                                    ↳ {getModelVariationLabel(item, model)}
+                                  </TableCell>
+                                  <TableCell>{model.model_sku || "-"}</TableCell>
+                                  <TableCell>{model.model_status || "-"}</TableCell>
+                                  <TableCell>{getModelTotalAvailableStock(model)}</TableCell>
+                                  <TableCell>
+                                    {formatPrice(modelPriceInfo?.current_price, modelPriceInfo?.currency)}
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatPrice(modelPriceInfo?.original_price, modelPriceInfo?.currency)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </Fragment>
                         );
                       })}
                     </TableBody>
@@ -341,7 +434,7 @@ function WarehouseProductsMain() {
                 ) : null}
 
                 <div className="text-sm text-slate-600">
-                  Showing {filteredItems.length} of {products?.items?.length ?? 0} on this page | Total:{" "}
+                  Showing {filteredItems.length} of {products?.items?.length ?? 0} parent items on this page | Total:{" "}
                   {products?.pagination.total_count ?? 0} items | Page {page} of {totalPages}
                 </div>
 

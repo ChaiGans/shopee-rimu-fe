@@ -39,11 +39,44 @@ export interface ProductAdvanceStockInfo {
   in_transit_advance_stock?: number;
 }
 
+export interface ProductDimensionInfo {
+  package_length?: number;
+  package_width?: number;
+  package_height?: number;
+}
+
 export interface ProductStockInfoV2 {
   summary_info?: ProductStockSummaryInfo;
   seller_stock?: ProductSellerStockInfo[];
   shopee_stock?: ProductShopeeStockInfo[];
   advance_stock?: ProductAdvanceStockInfo;
+}
+
+export interface ProductTierVariation {
+  name?: string;
+  option_list?: string[];
+}
+
+export interface ProductModelPreOrderInfo {
+  is_pre_order?: boolean;
+  days_to_ship?: number;
+}
+
+export interface ProductModel {
+  model_id: number;
+  tier_index?: number[];
+  promotion_id?: number;
+  has_promotion?: boolean;
+  model_sku?: string;
+  model_status?: string;
+  price_info: ProductPriceInfo[];
+  pre_order?: ProductModelPreOrderInfo;
+  stock_info_v2?: ProductStockInfoV2;
+  gtin_code?: string;
+  weight?: string;
+  dimension?: ProductDimensionInfo;
+  is_fulfillment_by_shopee?: boolean;
+  raw_model: Record<string, unknown>;
 }
 
 export interface ProductItem {
@@ -54,6 +87,10 @@ export interface ProductItem {
   update_time: number;
   price_info: ProductPriceInfo[];
   stock_info_v2?: ProductStockInfoV2;
+  has_model: boolean;
+  tier_variation: ProductTierVariation[];
+  standardise_tier_variation: Record<string, unknown>[];
+  models: ProductModel[];
   raw_item: Record<string, unknown>;
 }
 
