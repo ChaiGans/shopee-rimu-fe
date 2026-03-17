@@ -1,8 +1,16 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import Loading from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Pagination,
@@ -21,9 +29,20 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { getApiErrorMessage } from "@/lib/api-error";
-import { getMarketplaceProducts } from "@/services/productService";
+import {
+  applyProductHPPUpload,
+  getMarketplaceProducts,
+  previewProductHPPUpload,
+  upsertProductHPP,
+} from "@/services/productService";
 import { getShops } from "@/services/shopService";
-import { ProductItem, ProductListData, ProductModel, ProductStatus } from "@/types/Product";
+import {
+  ProductHPPUploadPreview,
+  ProductItem,
+  ProductListData,
+  ProductModel,
+  ProductStatus,
+} from "@/types/Product";
 import { Shop } from "@/types/Shop";
 
 const PRODUCT_STATUSES: ProductStatus[] = [
@@ -67,6 +86,10 @@ const getModelTotalAvailableStock = (model: ProductModel): string => {
 };
 
 const getModelVariationLabel = (item: ProductItem, model: ProductModel): string => {
+  if (model.variation_label && model.variation_label.trim() !== "") {
+    return model.variation_label;
+  }
+
   const labels = (model.tier_index ?? []).map((index, tierPosition) => {
     const tier = item.tier_variation?.[tierPosition];
     const option = tier?.option_list?.[index];
@@ -86,19 +109,30 @@ const getModelVariationLabel = (item: ProductItem, model: ProductModel): string 
   return labels.join(" / ");
 };
 
+const normalizeHPPInput = (value: string): string => value.replace(/[^\d]/g, "");
+
+const getHPPInputValue = (value?: number): string => {
+  if (typeof value !== "number") {
+    return "";
+  }
+  return value.toString();
+};
+
 const modelMatchesKeyword = (item: ProductItem, model: ProductModel, keyword: string): boolean => {
   const modelID = model.model_id.toString();
   const modelSKU = (model.model_sku ?? "").toLowerCase();
   const modelStatus = (model.model_status ?? "").toLowerCase();
   const modelStock = getModelTotalAvailableStock(model).toLowerCase();
   const modelLabel = getModelVariationLabel(item, model).toLowerCase();
+  const modelHPP = model.hpp?.toString() ?? "";
 
   return (
     modelID.includes(keyword) ||
     modelSKU.includes(keyword) ||
     modelStatus.includes(keyword) ||
     modelStock.includes(keyword) ||
-    modelLabel.includes(keyword)
+    modelLabel.includes(keyword) ||
+    modelHPP.includes(keyword)
   );
 };
 
@@ -108,13 +142,15 @@ const itemMatchesKeyword = (item: ProductItem, keyword: string): boolean => {
   const itemSKU = (item.item_sku ?? "").toLowerCase();
   const itemStatus = (item.item_status ?? "").toLowerCase();
   const itemStock = getTotalAvailableStock(item).toLowerCase();
+  const itemHPP = item.hpp?.toString() ?? "";
 
   return (
     itemID.includes(keyword) ||
     itemName.includes(keyword) ||
     itemSKU.includes(keyword) ||
     itemStatus.includes(keyword) ||
-    itemStock.includes(keyword)
+    itemStock.includes(keyword) ||
+    itemHPP.includes(keyword)
   );
 };
 
@@ -156,6 +192,13 @@ function WarehouseProductsMain() {
   const [pageSize, setPageSize] = useState(25);
   const [statuses, setStatuses] = useState<ProductStatus[]>(["NORMAL"]);
   const [search, setSearch] = useState("");
+  const [hppDrafts, setHppDrafts] = useState<Record<string, string>>({});
+  const [savingHppSkus, setSavingHppSkus] = useState<Record<string, boolean>>({});
+  const [hppPreview, setHppPreview] = useState<ProductHPPUploadPreview | null>(null);
+  const [isHppPreviewOpen, setIsHppPreviewOpen] = useState(false);
+  const [isHppPreviewLoading, setIsHppPreviewLoading] = useState(false);
+  const [isHppApplyLoading, setIsHppApplyLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const loadShops = async () => {
@@ -222,6 +265,21 @@ function WarehouseProductsMain() {
     void loadProducts();
   }, [page, pageSize, selectedShopId, statuses, toast]);
 
+  useEffect(() => {
+    const nextDrafts: Record<string, string> = {};
+    for (const item of products?.items ?? []) {
+      if (item.sku_rep) {
+        nextDrafts[item.sku_rep] = getHPPInputValue(item.hpp);
+      }
+      for (const model of item.models ?? []) {
+        if (model.sku_rep) {
+          nextDrafts[model.sku_rep] = getHPPInputValue(model.hpp);
+        }
+      }
+    }
+    setHppDrafts(nextDrafts);
+  }, [products]);
+
   const totalPages = useMemo(() => {
     const totalCount = products?.pagination.total_count ?? 0;
     if (totalCount === 0) {
@@ -279,6 +337,165 @@ function WarehouseProductsMain() {
     setStatuses([...PRODUCT_STATUSES]);
   };
 
+  const refreshProducts = async () => {
+    if (selectedShopId === null) {
+      return;
+    }
+
+    setProductsLoading(true);
+    try {
+      const response = await getMarketplaceProducts({
+        shopId: selectedShopId,
+        page,
+        size: pageSize,
+        statuses,
+      });
+      setProducts(response);
+    } catch (error) {
+      toast({
+        title: "Failed to load products",
+        description: getApiErrorMessage(error, "Unable to load products."),
+        variant: "destructive",
+      });
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const updateProductHPPState = (skuRep: string, hpp: number) => {
+    setProducts((prev) => {
+      if (!prev) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        items: prev.items.map((item) => ({
+          ...item,
+          hpp: item.sku_rep === skuRep ? hpp : item.hpp,
+          models: item.models.map((model) => ({
+            ...model,
+            hpp: model.sku_rep === skuRep ? hpp : model.hpp,
+          })),
+        })),
+      };
+    });
+  };
+
+  const handleHppBlur = async (skuRep: string | undefined, currentHpp?: number) => {
+    if (!skuRep) {
+      return;
+    }
+
+    const rawValue = hppDrafts[skuRep] ?? "";
+    const normalizedValue = normalizeHPPInput(rawValue);
+    if (normalizedValue === "") {
+      setHppDrafts((prev) => ({
+        ...prev,
+        [skuRep]: getHPPInputValue(currentHpp),
+      }));
+      return;
+    }
+
+    const parsed = Number(normalizedValue);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      setHppDrafts((prev) => ({
+        ...prev,
+        [skuRep]: getHPPInputValue(currentHpp),
+      }));
+      toast({
+        title: "Invalid HPP",
+        description: "HPP must be a non-negative number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (currentHpp === parsed) {
+      setHppDrafts((prev) => ({
+        ...prev,
+        [skuRep]: normalizedValue,
+      }));
+      return;
+    }
+
+    setSavingHppSkus((prev) => ({ ...prev, [skuRep]: true }));
+    try {
+      await upsertProductHPP({ sku_rep: skuRep, hpp: parsed });
+      updateProductHPPState(skuRep, parsed);
+      setHppDrafts((prev) => ({
+        ...prev,
+        [skuRep]: parsed.toString(),
+      }));
+    } catch (error) {
+      setHppDrafts((prev) => ({
+        ...prev,
+        [skuRep]: getHPPInputValue(currentHpp),
+      }));
+      toast({
+        title: "Failed to save HPP",
+        description: getApiErrorMessage(error, "Unable to update HPP."),
+        variant: "destructive",
+      });
+    } finally {
+      setSavingHppSkus((prev) => ({ ...prev, [skuRep]: false }));
+    }
+  };
+
+  const handlePreviewHppUpload = async (file: File) => {
+    setIsHppPreviewLoading(true);
+    try {
+      const preview = await previewProductHPPUpload(file);
+      setHppPreview(preview);
+      setIsHppPreviewOpen(true);
+    } catch (error) {
+      toast({
+        title: "Failed to preview HPP upload",
+        description: getApiErrorMessage(error, "Unable to preview HPP CSV."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsHppPreviewLoading(false);
+    }
+  };
+
+  const handleApplyHppUpload = async () => {
+    if (!hppPreview) {
+      return;
+    }
+
+    const rows = [
+      ...hppPreview.new_rows.map((row) => ({ sku_rep: row.sku_rep, hpp: row.incoming_hpp })),
+      ...hppPreview.update_rows.map((row) => ({ sku_rep: row.sku_rep, hpp: row.incoming_hpp })),
+    ];
+
+    if (rows.length === 0) {
+      setIsHppPreviewOpen(false);
+      return;
+    }
+
+    setIsHppApplyLoading(true);
+    try {
+      await applyProductHPPUpload(rows);
+      setIsHppPreviewOpen(false);
+      setHppPreview(null);
+      await refreshProducts();
+      toast({
+        title: "HPP uploaded",
+        description: `Applied ${rows.length} HPP updates.`,
+        variant: "success",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to apply HPP upload",
+        description: getApiErrorMessage(error, "Unable to apply HPP upload."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsHppApplyLoading(false);
+    }
+  };
+
   return (
     <Card className="p-4 space-y-4">
       <CardHeader>
@@ -326,6 +543,28 @@ function WarehouseProductsMain() {
                     }}
                     className="w-24"
                   />
+                </div>
+                <div className="pb-0.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        void handlePreviewHppUpload(file);
+                      }
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isHppPreviewLoading}
+                  >
+                    {isHppPreviewLoading ? "Preparing..." : "Upload HPP"}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -377,6 +616,7 @@ function WarehouseProductsMain() {
                         <TableHead>Item SKU</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Stock</TableHead>
+                        <TableHead>HPP</TableHead>
 
                         <TableHead>Current Price</TableHead>
                         <TableHead>Original Price</TableHead>
@@ -393,6 +633,24 @@ function WarehouseProductsMain() {
                               <TableCell>{item.item_sku || "-"}</TableCell>
                               <TableCell>{item.item_status || "-"}</TableCell>
                               <TableCell>{getTotalAvailableStock(item)}</TableCell>
+                              <TableCell className="min-w-[120px]">
+                                {item.sku_rep ? (
+                                  <Input
+                                    value={hppDrafts[item.sku_rep] ?? ""}
+                                    onChange={(event) =>
+                                      setHppDrafts((prev) => ({
+                                        ...prev,
+                                        [item.sku_rep!]: normalizeHPPInput(event.target.value),
+                                      }))
+                                    }
+                                    onBlur={() => void handleHppBlur(item.sku_rep, item.hpp)}
+                                    disabled={savingHppSkus[item.sku_rep] === true}
+                                    placeholder="HPP"
+                                  />
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </TableCell>
                               <TableCell>
                                 {formatPrice(priceInfo?.current_price, priceInfo?.currency)}
                               </TableCell>
@@ -411,6 +669,24 @@ function WarehouseProductsMain() {
                                   <TableCell>{model.model_sku || "-"}</TableCell>
                                   <TableCell>{model.model_status || "-"}</TableCell>
                                   <TableCell>{getModelTotalAvailableStock(model)}</TableCell>
+                                  <TableCell className="min-w-[120px]">
+                                    {model.sku_rep ? (
+                                      <Input
+                                        value={hppDrafts[model.sku_rep] ?? ""}
+                                        onChange={(event) =>
+                                          setHppDrafts((prev) => ({
+                                            ...prev,
+                                            [model.sku_rep!]: normalizeHPPInput(event.target.value),
+                                          }))
+                                        }
+                                        onBlur={() => void handleHppBlur(model.sku_rep, model.hpp)}
+                                        disabled={savingHppSkus[model.sku_rep] === true}
+                                        placeholder="HPP"
+                                      />
+                                    ) : (
+                                      <span className="text-slate-400">-</span>
+                                    )}
+                                  </TableCell>
                                   <TableCell>
                                     {formatPrice(modelPriceInfo?.current_price, modelPriceInfo?.currency)}
                                   </TableCell>
@@ -469,6 +745,105 @@ function WarehouseProductsMain() {
           </>
         )}
       </CardContent>
+
+      <Dialog open={isHppPreviewOpen} onOpenChange={setIsHppPreviewOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>HPP Upload Preview</DialogTitle>
+            <DialogDescription>
+              Review the CSV impact before applying HPP updates to your connected shops.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-sm">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-md border p-3">
+                <div className="text-slate-500">New</div>
+                <div className="text-lg font-semibold">{hppPreview?.new_rows.length ?? 0}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-slate-500">Update</div>
+                <div className="text-lg font-semibold">{hppPreview?.update_rows.length ?? 0}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-slate-500">Unchanged</div>
+                <div className="text-lg font-semibold">{hppPreview?.unchanged_rows.length ?? 0}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-slate-500">Invalid</div>
+                <div className="text-lg font-semibold">{hppPreview?.invalid_rows.length ?? 0}</div>
+              </div>
+            </div>
+
+            {hppPreview && (hppPreview.new_rows.length > 0 || hppPreview.update_rows.length > 0) ? (
+              <div className="space-y-2">
+                <div className="font-medium">Rows to apply</div>
+                <div className="max-h-56 overflow-y-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>SKU</TableHead>
+                        <TableHead>Incoming HPP</TableHead>
+                        <TableHead>Existing HPP</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...(hppPreview.new_rows ?? []), ...(hppPreview.update_rows ?? [])].map((row) => (
+                        <TableRow key={`${row.sku_rep}-${row.incoming_hpp}`}>
+                          <TableCell>{row.sku_rep}</TableCell>
+                          <TableCell>{row.incoming_hpp}</TableCell>
+                          <TableCell>{row.existing_hpp ?? "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : null}
+
+            {hppPreview && hppPreview.invalid_rows.length > 0 ? (
+              <div className="space-y-2">
+                <div className="font-medium text-red-600">Invalid rows</div>
+                <div className="max-h-40 overflow-y-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Row</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead>Error</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {hppPreview.invalid_rows.map((row) => (
+                        <TableRow key={`${row.row_number}-${row.sku_rep}`}>
+                          <TableCell>{row.row_number}</TableCell>
+                          <TableCell>{row.sku_rep || "-"}</TableCell>
+                          <TableCell>{row.error}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsHppPreviewOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleApplyHppUpload()}
+              disabled={
+                isHppApplyLoading ||
+                ((hppPreview?.new_rows.length ?? 0) === 0 && (hppPreview?.update_rows.length ?? 0) === 0)
+              }
+            >
+              {isHppApplyLoading ? "Applying..." : "Apply HPP Upload"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

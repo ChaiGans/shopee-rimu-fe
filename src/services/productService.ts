@@ -1,6 +1,10 @@
 import api from "@/api/axios";
 import { ApiResponse } from "@/types/ApiResponse";
-import { ProductListData, ProductStatus } from "@/types/Product";
+import {
+  ProductHPPUploadPreview,
+  ProductListData,
+  ProductStatus,
+} from "@/types/Product";
 
 export interface GetMarketplaceProductsParams {
   shopId: number;
@@ -24,4 +28,34 @@ export const getMarketplaceProducts = async (
     `/api/marketplace/product/${params.shopId.toString()}/list?${searchParams.toString()}`,
   );
   return response.data.data;
+};
+
+export const upsertProductHPP = async (payload: {
+  sku_rep: string;
+  hpp: number;
+}): Promise<void> => {
+  await api.put("/api/marketplace/product/hpp", payload);
+};
+
+export const previewProductHPPUpload = async (
+  file: File,
+): Promise<ProductHPPUploadPreview> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await api.post<ApiResponse<ProductHPPUploadPreview>>(
+    "/api/marketplace/product/hpp/upload-preview",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  );
+
+  return response.data.data;
+};
+
+export const applyProductHPPUpload = async (
+  rows: Array<{ sku_rep: string; hpp: number }>,
+): Promise<void> => {
+  await api.post("/api/marketplace/product/hpp/upload-apply", { rows });
 };

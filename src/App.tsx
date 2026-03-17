@@ -5,7 +5,6 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Register from "./pages/Register";
-import HPP from "./pages/HPP";
 import ProtectedRouteProvider from "./components/provider/ProtectedRouteProvider";
 import NettProfitGenerator from "./pages/NettProfitGenerator";
 import AutoShippingConfig from "./pages/AutoShippingConfig";
@@ -29,15 +28,6 @@ function App() {
             }
           />
           <Route path="about" element={<About />} />
-
-          <Route
-            path="utilities/hpp"
-            element={
-              <ProtectedRouteProvider>
-                <HPP />
-              </ProtectedRouteProvider>
-            }
-          />
           <Route
             path="utilities/nett-profit-generator"
             element={

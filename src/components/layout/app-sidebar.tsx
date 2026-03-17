@@ -18,7 +18,6 @@ import { useToast } from "../ui/use-toast";
 import {
   Home as HomeIcon,
   Info,
-  Package,
   Warehouse,
   LogOut,
   LogIn,
@@ -107,12 +106,6 @@ export function AppSidebar() {
     {
       label: "Utilities",
       items: [
-        {
-          path: "/utilities/hpp",
-          label: "HPP",
-          icon: Package,
-          authOnly: true,
-        },
         {
           path: "/utilities/nett-profit-generator",
           label: "Nett Profit Generator",

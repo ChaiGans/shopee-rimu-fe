@@ -69,6 +69,9 @@ export interface ProductModel {
   has_promotion?: boolean;
   model_sku?: string;
   model_status?: string;
+  sku_rep?: string;
+  hpp?: number;
+  variation_label?: string;
   price_info: ProductPriceInfo[];
   pre_order?: ProductModelPreOrderInfo;
   stock_info_v2?: ProductStockInfoV2;
@@ -83,6 +86,9 @@ export interface ProductItem {
   item_id: number;
   item_name?: string;
   item_sku?: string;
+  sku_rep?: string;
+  hpp?: number;
+  variation_label?: string;
   item_status: string;
   update_time: number;
   price_info: ProductPriceInfo[];
@@ -106,4 +112,24 @@ export interface ProductListData {
   items: ProductItem[];
   pagination: ProductPagination;
   applied_statuses: string[];
+}
+
+export interface ProductHPPPreviewRow {
+  sku_rep: string;
+  incoming_hpp: number;
+  existing_hpp?: number;
+}
+
+export interface ProductHPPInvalidRow {
+  row_number: number;
+  sku_rep: string;
+  raw_hpp: string;
+  error: string;
+}
+
+export interface ProductHPPUploadPreview {
+  new_rows: ProductHPPPreviewRow[];
+  update_rows: ProductHPPPreviewRow[];
+  unchanged_rows: ProductHPPPreviewRow[];
+  invalid_rows: ProductHPPInvalidRow[];
 }

@@ -8,7 +8,6 @@ const pageTitleMap: Record<string, string> = {
   "/auto-shipping-config": "Auto Shipping Config",
   "/warehouse/perhitungan-selisih": "Perhitungan Selisih",
   "/warehouse/products": "Products",
-  "/hpp": "HPP",
 };
 
 export default function Layout() {
