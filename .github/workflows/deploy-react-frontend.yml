@@ -37,12 +37,10 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          images: ghcr.io/chaigans/shopee-rimu-fe
           tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=raw,value=latest
+            type=sha,prefix=sha-
 
       - name: Build and push image
         uses: docker/build-push-action@v5
