@@ -54,14 +54,15 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
+            set -e
             cd ${{ secrets.DOCKER_COMPOSE_PATH }}
-            docker login ${{ env.REGISTRY }} -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-            docker compose pull ${{ env.IMAGE_NAME }}
-            docker compose up -d ${{ env.IMAGE_NAME }}
-            echo "✅ ${{ env.IMAGE_NAME }} deployed successfully"
+            echo "${{ secrets.GHCR_PAT }}" | docker login ${{ env.REGISTRY }} -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+            docker compose pull ${{ env.SERVICE_NAME }}
+            docker compose up -d ${{ env.SERVICE_NAME }}
+            echo "✅ ${{ env.SERVICE_NAME }} deployed successfully"
