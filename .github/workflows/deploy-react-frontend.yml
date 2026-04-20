@@ -10,6 +10,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: shopee-rimu-fe
+  SERVICE_NAME: fe-react
 
 jobs:
   build-and-deploy:
