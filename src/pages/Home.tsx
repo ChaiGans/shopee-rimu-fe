@@ -50,7 +50,7 @@ const resolveTokenStatus = (shop: Shop): {
 const getConnectURL = (): string => {
   const apiURL = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
   if (!apiURL) {
-    return "";
+    return "/api/auth/shopee/connect";
   }
 
   return `${apiURL.replace(/\/+$/, "")}/api/auth/shopee/connect`;
@@ -150,15 +150,6 @@ function Home() {
   }, [location.pathname, location.search, navigate, toast]);
 
   const handleConnectShopee = () => {
-    if (!connectURL) {
-      toast({
-        title: "Configuration Missing",
-        description: "VITE_API_URL is not configured.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     window.location.assign(connectURL);
   };
 
