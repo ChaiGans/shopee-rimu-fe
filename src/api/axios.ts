@@ -1,8 +1,13 @@
 // src/api/axios.ts
 import axios from "axios";
 
+const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim() ?? "";
+const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "") || undefined;
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  // Default to same-origin requests so production can rely on the reverse proxy.
+  // VITE_API_URL remains available as an optional override for local development.
+  baseURL: apiBaseUrl,
   headers: {
     "Content-Type": "application/json",
   },
