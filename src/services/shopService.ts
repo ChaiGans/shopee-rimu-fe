@@ -13,6 +13,9 @@ export const updateShop = async (
     shop_name?: string;
     shop_code?: string;
     auto_shipment_enabled?: boolean;
+    telegram_bot_token?: string;
+    telegram_chat_id?: string;
+    clear_telegram_config?: boolean;
   }
 ): Promise<Shop> => {
   const response = await api.put<ApiResponse<Shop>>(`/api/shop/${shopId}`, payload);

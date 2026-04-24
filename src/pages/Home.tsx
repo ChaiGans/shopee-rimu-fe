@@ -92,7 +92,10 @@ function Home() {
   const [loading, setLoading] = useState<boolean>(true);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [shopNameInput, setShopNameInput] = useState("");
-  const [isSavingShopName, setIsSavingShopName] = useState(false);
+  const [telegramBotTokenInput, setTelegramBotTokenInput] = useState("");
+  const [telegramChatIDInput, setTelegramChatIDInput] = useState("");
+  const [isSavingShopDetails, setIsSavingShopDetails] = useState(false);
+  const [isClearingTelegramConfig, setIsClearingTelegramConfig] = useState(false);
   const [savingAutoShippingShopID, setSavingAutoShippingShopID] = useState<
     number | null
   >(null);
@@ -172,41 +175,75 @@ function Home() {
   const openEditShopDialog = (shop: Shop) => {
     setEditingShop(shop);
     setShopNameInput(shop.name ?? "");
+    setTelegramBotTokenInput("");
+    setTelegramChatIDInput("");
+    setIsSavingShopDetails(false);
+    setIsClearingTelegramConfig(false);
   };
 
   const handleEditDialogChange = (open: boolean) => {
     if (!open) {
       setEditingShop(null);
       setShopNameInput("");
-      setIsSavingShopName(false);
+      setTelegramBotTokenInput("");
+      setTelegramChatIDInput("");
+      setIsSavingShopDetails(false);
+      setIsClearingTelegramConfig(false);
     }
   };
 
-  const handleSaveShopName = async () => {
+  const mergeUpdatedShop = (updatedShop: Shop) => {
+    setShops((prev) =>
+      prev.map((shop) =>
+        shop.id === updatedShop.id
+          ? {
+              ...shop,
+              ...updatedShop,
+            }
+          : shop,
+      ),
+    );
+  };
+
+  const handleSaveShopDetails = async () => {
     if (!editingShop) {
       return;
     }
 
-    setIsSavingShopName(true);
+    const telegramBotToken = telegramBotTokenInput.trim();
+    const telegramChatID = telegramChatIDInput.trim();
+    const hasTelegramBotToken = telegramBotToken !== "";
+    const hasTelegramChatID = telegramChatID !== "";
+
+    if (hasTelegramBotToken !== hasTelegramChatID) {
+      toast({
+        title: "Invalid Telegram Configuration",
+        description: "Telegram bot token and chat ID must be filled together.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingShopDetails(true);
     try {
       const updatedShop = await updateShop(editingShop.id, {
         shop_name: shopNameInput.trim(),
+        ...(hasTelegramBotToken && hasTelegramChatID
+          ? {
+              telegram_bot_token: telegramBotToken,
+              telegram_chat_id: telegramChatID,
+            }
+          : {}),
       });
 
-      setShops((prev) =>
-        prev.map((shop) =>
-          shop.id === editingShop.id
-            ? {
-                ...shop,
-                ...updatedShop,
-              }
-            : shop,
-        ),
-      );
+      mergeUpdatedShop(updatedShop);
 
       toast({
         title: "Shop Updated",
-        description: "Shop name updated successfully.",
+        description:
+          hasTelegramBotToken && hasTelegramChatID
+            ? "Shop details and Telegram configuration updated successfully."
+            : "Shop name updated successfully.",
         variant: "success",
       });
 
@@ -214,10 +251,40 @@ function Home() {
     } catch (error) {
       toast({
         title: "Update Failed",
-        description: getApiErrorMessage(error, "Unable to update shop name."),
+        description: getApiErrorMessage(error, "Unable to update shop settings."),
         variant: "destructive",
       });
-      setIsSavingShopName(false);
+      setIsSavingShopDetails(false);
+    }
+  };
+
+  const handleClearTelegramConfig = async () => {
+    if (!editingShop) {
+      return;
+    }
+
+    setIsClearingTelegramConfig(true);
+    try {
+      const updatedShop = await updateShop(editingShop.id, {
+        clear_telegram_config: true,
+      });
+
+      mergeUpdatedShop(updatedShop);
+
+      toast({
+        title: "Telegram Configuration Cleared",
+        description: `${resolveShopLabel(editingShop)} Telegram delivery has been removed.`,
+        variant: "success",
+      });
+
+      handleEditDialogChange(false);
+    } catch (error) {
+      toast({
+        title: "Clear Failed",
+        description: getApiErrorMessage(error, "Unable to clear Telegram configuration."),
+        variant: "destructive",
+      });
+      setIsClearingTelegramConfig(false);
     }
   };
 
@@ -229,16 +296,7 @@ function Home() {
         auto_shipment_enabled: checked,
       });
 
-      setShops((prev) =>
-        prev.map((currentShop) =>
-          currentShop.id === shop.id
-            ? {
-                ...currentShop,
-                ...updatedShop,
-              }
-            : currentShop,
-        ),
-      );
+      mergeUpdatedShop(updatedShop);
 
       toast({
         title: checked ? "Auto Shipment Enabled" : "Auto Shipment Disabled",
@@ -295,6 +353,7 @@ function Home() {
                     <TableHead>Identifier</TableHead>
                     <TableHead>Marketplace</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Telegram</TableHead>
                     <TableHead>Refresh Token Expires At</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -315,6 +374,17 @@ function Home() {
                             className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${status.className}`}
                           >
                             {status.label}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
+                              shop.has_telegram_config
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {shop.has_telegram_config ? "Configured" : "Not Configured"}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -342,7 +412,7 @@ function Home() {
                               size="sm"
                               onClick={() => openEditShopDialog(shop)}
                             >
-                              Edit Name
+                              Edit Shop
                             </Button>
                           </div>
                         </TableCell>
@@ -359,35 +429,83 @@ function Home() {
       <Dialog open={Boolean(editingShop)} onOpenChange={handleEditDialogChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Shop Name</DialogTitle>
+            <DialogTitle>Edit Shop</DialogTitle>
             <DialogDescription>
-              Set a friendly name for this connected Shopee shop. Leave it empty to fall back to the shop identifier.
+              Update the shop name and Telegram destination for this connected Shopee shop. Saved Telegram credentials are write-only and will not be shown again.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="shop-name-input">
-              Shop Name
-            </label>
-            <Input
-              id="shop-name-input"
-              placeholder="e.g. Rimu Medan Main Store"
-              value={shopNameInput}
-              onChange={(event) => setShopNameInput(event.target.value)}
-              disabled={isSavingShopName}
-            />
+          <div className="space-y-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+              Telegram status:{" "}
+              <span className="font-medium text-slate-900">
+                {editingShop?.has_telegram_config ? "Configured" : "Not configured"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="shop-name-input">
+                Shop Name
+              </label>
+              <Input
+                id="shop-name-input"
+                placeholder="e.g. Rimu Medan Main Store"
+                value={shopNameInput}
+                onChange={(event) => setShopNameInput(event.target.value)}
+                disabled={isSavingShopDetails || isClearingTelegramConfig}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="telegram-bot-token-input">
+                Telegram Bot Token
+              </label>
+              <Input
+                id="telegram-bot-token-input"
+                type="password"
+                placeholder="Enter a new bot token to set or replace"
+                value={telegramBotTokenInput}
+                onChange={(event) => setTelegramBotTokenInput(event.target.value)}
+                disabled={isSavingShopDetails || isClearingTelegramConfig}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="telegram-chat-id-input">
+                Telegram Chat ID
+              </label>
+              <Input
+                id="telegram-chat-id-input"
+                placeholder="e.g. -1001234567890"
+                value={telegramChatIDInput}
+                onChange={(event) => setTelegramChatIDInput(event.target.value)}
+                disabled={isSavingShopDetails || isClearingTelegramConfig}
+              />
+            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
+            {editingShop?.has_telegram_config ? (
+              <Button
+                variant="outline"
+                onClick={() => void handleClearTelegramConfig()}
+                disabled={isSavingShopDetails || isClearingTelegramConfig}
+              >
+                {isClearingTelegramConfig ? "Clearing..." : "Clear Telegram"}
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               onClick={() => handleEditDialogChange(false)}
-              disabled={isSavingShopName}
+              disabled={isSavingShopDetails || isClearingTelegramConfig}
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveShopName} disabled={isSavingShopName}>
-              {isSavingShopName ? "Saving..." : "Save Name"}
+            <Button
+              onClick={() => void handleSaveShopDetails()}
+              disabled={isSavingShopDetails || isClearingTelegramConfig}
+            >
+              {isSavingShopDetails ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
