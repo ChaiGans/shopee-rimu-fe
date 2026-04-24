@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -92,6 +93,9 @@ function Home() {
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [shopNameInput, setShopNameInput] = useState("");
   const [isSavingShopName, setIsSavingShopName] = useState(false);
+  const [savingAutoShippingShopID, setSavingAutoShippingShopID] = useState<
+    number | null
+  >(null);
 
   const handledSearchRef = useRef<string | null>(null);
   const connectURL = useMemo(() => getConnectURL(), []);
@@ -196,8 +200,8 @@ function Home() {
                 ...shop,
                 ...updatedShop,
               }
-            : shop
-        )
+            : shop,
+        ),
       );
 
       toast({
@@ -214,6 +218,46 @@ function Home() {
         variant: "destructive",
       });
       setIsSavingShopName(false);
+    }
+  };
+
+  const handleAutoShipmentToggle = async (shop: Shop, checked: boolean) => {
+    setSavingAutoShippingShopID(shop.id);
+
+    try {
+      const updatedShop = await updateShop(shop.id, {
+        auto_shipment_enabled: checked,
+      });
+
+      setShops((prev) =>
+        prev.map((currentShop) =>
+          currentShop.id === shop.id
+            ? {
+                ...currentShop,
+                ...updatedShop,
+              }
+            : currentShop,
+        ),
+      );
+
+      toast({
+        title: checked ? "Auto Shipment Enabled" : "Auto Shipment Disabled",
+        description: `${resolveShopLabel(shop)} updated successfully.`,
+        variant: "success",
+      });
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: getApiErrorMessage(
+          error,
+          "Unable to update auto shipment setting.",
+        ),
+        variant: "destructive",
+      });
+    } finally {
+      setSavingAutoShippingShopID((current) =>
+        current === shop.id ? null : current,
+      );
     }
   };
 
@@ -258,6 +302,9 @@ function Home() {
                 <TableBody>
                   {shops.map((shop) => {
                     const status = resolveTokenStatus(shop);
+                    const isSavingAutoShipment =
+                      savingAutoShippingShopID === shop.id;
+
                     return (
                       <TableRow key={shop.id}>
                         <TableCell>{resolveShopLabel(shop)}</TableCell>
@@ -276,13 +323,28 @@ function Home() {
                             : "-"}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEditShopDialog(shop)}
-                          >
-                            Edit Name
-                          </Button>
+                          <div className="flex flex-col items-end gap-2 md:flex-row md:items-center md:justify-end">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500">
+                                Auto Shipment
+                              </span>
+                              <Switch
+                                checked={Boolean(shop.auto_shipment_enabled)}
+                                disabled={isSavingAutoShipment}
+                                aria-label={`Toggle auto shipment for ${resolveShopLabel(shop)}`}
+                                onCheckedChange={(checked) =>
+                                  void handleAutoShipmentToggle(shop, checked)
+                                }
+                              />
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditShopDialog(shop)}
+                            >
+                              Edit Name
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

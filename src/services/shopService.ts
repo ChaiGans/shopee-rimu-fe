@@ -9,7 +9,11 @@ export const getShops = async (): Promise<Shop[]> => {
 
 export const updateShop = async (
   shopId: number,
-  payload: { shop_name: string; shop_code?: string }
+  payload: {
+    shop_name?: string;
+    shop_code?: string;
+    auto_shipment_enabled?: boolean;
+  }
 ): Promise<Shop> => {
   const response = await api.put<ApiResponse<Shop>>(`/api/shop/${shopId}`, payload);
   return response.data.data;
