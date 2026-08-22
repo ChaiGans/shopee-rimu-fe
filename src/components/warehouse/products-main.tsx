@@ -31,8 +31,10 @@ import { useToast } from "@/components/ui/use-toast";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
   applyProductHPPUpload,
+  exportMarketplaceProducts,
   getMarketplaceProducts,
   previewProductHPPUpload,
+  type ProductExportFormat,
   upsertProductHPP,
 } from "@/services/productService";
 import { getShops } from "@/services/shopService";
@@ -198,7 +200,10 @@ function WarehouseProductsMain() {
   const [isHppPreviewOpen, setIsHppPreviewOpen] = useState(false);
   const [isHppPreviewLoading, setIsHppPreviewLoading] = useState(false);
   const [isHppApplyLoading, setIsHppApplyLoading] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ProductExportFormat | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const loadShops = async () => {
@@ -234,6 +239,30 @@ function WarehouseProductsMain() {
 
     void loadShops();
   }, [toast]);
+
+  useEffect(() => {
+    if (!isExportMenuOpen) {
+      return;
+    }
+
+    const closeMenuOnOutsideClick = (event: PointerEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+    };
+    const closeMenuOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsExportMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeMenuOnOutsideClick);
+    document.addEventListener("keydown", closeMenuOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenuOnOutsideClick);
+      document.removeEventListener("keydown", closeMenuOnEscape);
+    };
+  }, [isExportMenuOpen]);
 
   useEffect(() => {
     if (selectedShopId === null) {
@@ -335,6 +364,35 @@ function WarehouseProductsMain() {
   const selectAllStatuses = () => {
     setPage(1);
     setStatuses([...PRODUCT_STATUSES]);
+  };
+
+  const handleProductExport = async (format: ProductExportFormat) => {
+    if (selectedShopId === null || exportingFormat !== null) {
+      return;
+    }
+
+    setIsExportMenuOpen(false);
+    setExportingFormat(format);
+    try {
+      await exportMarketplaceProducts({
+        shopId: selectedShopId,
+        statuses,
+        format,
+      });
+      toast({
+        title: "Products exported",
+        description: `Downloaded products as ${format.toUpperCase()}.`,
+        variant: "success",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to export products",
+        description: getApiErrorMessage(error, "Unable to export products."),
+        variant: "destructive",
+      });
+    } finally {
+      setExportingFormat(null);
+    }
   };
 
   const refreshProducts = async () => {
@@ -565,6 +623,47 @@ function WarehouseProductsMain() {
                   >
                     {isHppPreviewLoading ? "Preparing..." : "Upload HPP"}
                   </Button>
+                </div>
+                <div className="relative pb-0.5" ref={exportMenuRef}>
+                  <Button
+                    variant="outline"
+                    aria-haspopup="menu"
+                    aria-expanded={isExportMenuOpen}
+                    onClick={() => setIsExportMenuOpen((isOpen) => !isOpen)}
+                    disabled={selectedShopId === null || exportingFormat !== null}
+                  >
+                    {exportingFormat
+                      ? `Exporting ${exportingFormat.toUpperCase()}...`
+                      : "Export"}
+                  </Button>
+                  {isExportMenuOpen ? (
+                    <div
+                      role="menu"
+                      aria-label="Export products as"
+                      className="absolute right-0 z-10 mt-2 min-w-32 rounded-md border border-slate-200 bg-white p-1 shadow-md"
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start"
+                        role="menuitem"
+                        onClick={() => void handleProductExport("json")}
+                        disabled={exportingFormat !== null}
+                      >
+                        as JSON
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start"
+                        role="menuitem"
+                        onClick={() => void handleProductExport("csv")}
+                        disabled={exportingFormat !== null}
+                      >
+                        as CSV
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
