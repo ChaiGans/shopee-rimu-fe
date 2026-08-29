@@ -1,0 +1,195 @@
+{
+  "info": {
+    "_postman_id": "8e17c5a2-4b6d-4d90-a6c1-9f2e7b5d4e05",
+    "name": "Shopee RIMU Frontend Integration",
+    "description": "The Vite frontend does not expose an API of its own. This collection smoke-tests the frontend entrypoint and the backend requests declared by src/services. The backend uses an HttpOnly access_token cookie, so keep Postman's cookie jar enabled. Endpoint ledger for this PR: Added none, Modified none, Deleted none; integration documentation only.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "frontendUrl", "value": "http://localhost:5173", "type": "string" },
+    { "key": "apiBaseUrl", "value": "http://localhost:8081", "type": "string", "description": "Matches the VITE_API_URL development example." },
+    { "key": "username", "value": "postman-demo-user", "type": "string" },
+    { "key": "password", "value": "example-password", "type": "string" },
+    { "key": "role", "value": "general", "type": "string" },
+    { "key": "jwtToken", "value": "", "type": "string", "description": "Captured for inspection only; protected routes use the access_token cookie." },
+    { "key": "shopId", "value": "1", "type": "string" },
+    { "key": "shopName", "value": "Demo Shop", "type": "string" },
+    { "key": "shopCode", "value": "example-shop-code", "type": "string" },
+    { "key": "hppCsvFile", "value": "", "type": "string" },
+    { "key": "orderDataFile", "value": "", "type": "string", "description": "FileDataPesananan input used by the legacy NPG client call." },
+    { "key": "incomeFile", "value": "", "type": "string", "description": "FilePenghasilan input used by the legacy NPG client call." }
+  ],
+  "item": [
+    {
+      "name": "Frontend",
+      "item": [
+        {
+          "name": "Load Vite Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('frontend is reachable', function () { pm.expect(pm.response.code).to.be.below(400); });"] }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{frontendUrl}}/" },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth Requests",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('registration succeeds', function () { pm.response.to.have.status(200); });", "const body = pm.response.json();", "if (body.data && body.data.jwt_token) pm.collectionVariables.set('jwtToken', body.data.jwt_token);"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{role}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{apiBaseUrl}}/api/auth/register"
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('login succeeds', function () { pm.response.to.have.status(200); });", "const body = pm.response.json();", "if (body.data && body.data.jwt_token) pm.collectionVariables.set('jwtToken', body.data.jwt_token);"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{apiBaseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": { "method": "GET", "header": [], "url": "{{apiBaseUrl}}/api/auth/self" },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": { "method": "POST", "header": [], "url": "{{apiBaseUrl}}/api/auth/logout" },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Shop and Logistics Requests",
+      "item": [
+        {
+          "name": "List Shops",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('shops are returned', function () { pm.response.to.have.status(200); });", "const body = pm.response.json();", "if (Array.isArray(body.data) && body.data.length > 0 && body.data[0].id) pm.collectionVariables.set('shopId', String(body.data[0].id));"] }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{apiBaseUrl}}/api/shop/" },
+          "response": []
+        },
+        {
+          "name": "Update Shop",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"shop_name\": \"{{shopName}}\",\n  \"shop_code\": \"{{shopCode}}\",\n  \"auto_shipment_enabled\": false\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{apiBaseUrl}}/api/shop/{{shopId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Logistics Channel Config",
+          "request": { "method": "GET", "header": [], "url": "{{apiBaseUrl}}/api/shop/{{shopId}}/logistics-channel-config" },
+          "response": []
+        },
+        {
+          "name": "Replace Logistics Channel Config",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"channels\": [\n    {\n      \"logistics_channel_id\": 123,\n      \"auto_shipment_enabled\": false,\n      \"window_start\": \"09:00\",\n      \"window_end\": \"18:00\"\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{apiBaseUrl}}/api/shop/{{shopId}}/logistics-channel-config"
+          },
+          "response": []
+        },
+        {
+          "name": "Sync Logistics Channels",
+          "request": { "method": "GET", "header": [], "url": "{{apiBaseUrl}}/api/marketplace/shop/{{shopId}}/channel-list" },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Product and HPP Requests",
+      "item": [
+        {
+          "name": "List Marketplace Products",
+          "request": { "method": "GET", "header": [], "url": "{{apiBaseUrl}}/api/marketplace/product/{{shopId}}/list?page=1&size=20&status=NORMAL&status=BANNED" },
+          "response": []
+        },
+        {
+          "name": "Upsert Product HPP",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"sku_rep\": \"SKU-123\",\n  \"hpp\": 12500\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{apiBaseUrl}}/api/marketplace/product/hpp"
+          },
+          "response": []
+        },
+        {
+          "name": "Preview HPP CSV",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{hppCsvFile}}" }] },
+            "url": "{{apiBaseUrl}}/api/marketplace/product/hpp/upload-preview"
+          },
+          "response": []
+        },
+        {
+          "name": "Apply HPP CSV Rows",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"rows\": [\n    { \"sku_rep\": \"SKU-123\", \"hpp\": 12500 }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{apiBaseUrl}}/api/marketplace/product/hpp/upload-apply"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Legacy NPG Request",
+      "item": [
+        {
+          "name": "Upload NPG Excel (frontend-declared)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "FileDataPesananan", "type": "file", "src": "{{orderDataFile}}" },
+                { "key": "FilePenghasilan", "type": "file", "src": "{{incomeFile}}" }
+              ]
+            },
+            "url": "{{apiBaseUrl}}/api/excel/npg/upload",
+            "description": "Declared by src/services/npgService.ts. No matching route is registered in rimu-be-go at the workspace-pinned commit, so this request currently exposes the integration gap and is expected to return 404 until the backend route is restored."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
