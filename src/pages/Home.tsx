@@ -9,6 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -25,11 +32,7 @@ import { getShops, pingTelegram, updateShop } from "@/services/shopService";
 import { Shop } from "@/types/Shop";
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
-
-const shopActionMenuWidth = 192;
-const shopActionMenuHeight = 136;
 
 const resolveShopLabel = (shop: Shop): string => {
   if (shop.name && shop.name.trim() !== "") {
@@ -102,91 +105,12 @@ function Home() {
   const [isSavingShopDetails, setIsSavingShopDetails] = useState(false);
   const [clearingTelegramShopID, setClearingTelegramShopID] = useState<number | null>(null);
   const [pingingTelegramShopID, setPingingTelegramShopID] = useState<number | null>(null);
-  const [openShopActionsID, setOpenShopActionsID] = useState<number | null>(null);
-  const [shopActionsPosition, setShopActionsPosition] = useState<
-    { top: number; left: number } | null
-  >(null);
   const [savingAutoShippingShopID, setSavingAutoShippingShopID] = useState<
     number | null
   >(null);
 
   const handledSearchRef = useRef<string | null>(null);
-  const shopActionButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
   const connectURL = useMemo(() => getConnectURL(), []);
-
-  const closeShopActions = () => {
-    setOpenShopActionsID(null);
-    setShopActionsPosition(null);
-  };
-
-  const toggleShopActions = (shopID: number) => {
-    if (openShopActionsID === shopID) {
-      closeShopActions();
-      return;
-    }
-
-    const button = shopActionButtonRefs.current[shopID];
-    if (!button) {
-      return;
-    }
-
-    const buttonBounds = button.getBoundingClientRect();
-    const maxLeft = Math.max(8, window.innerWidth - shopActionMenuWidth - 8);
-    const left = Math.min(
-      maxLeft,
-      Math.max(8, buttonBounds.right - shopActionMenuWidth),
-    );
-    const opensAbove =
-      window.innerHeight - buttonBounds.bottom < shopActionMenuHeight + 8 &&
-      buttonBounds.top >= shopActionMenuHeight + 8;
-    const top = opensAbove
-      ? buttonBounds.top - shopActionMenuHeight - 8
-      : buttonBounds.bottom + 8;
-
-    setShopActionsPosition({ top, left });
-    setOpenShopActionsID(shopID);
-  };
-
-  useEffect(() => {
-    if (openShopActionsID === null) {
-      return;
-    }
-
-    const handleDocumentPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest("[data-shop-actions]")) {
-        return;
-      }
-      closeShopActions();
-    };
-
-    const handleDocumentKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeShopActions();
-      }
-    };
-
-    document.addEventListener("pointerdown", handleDocumentPointerDown);
-    document.addEventListener("keydown", handleDocumentKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handleDocumentPointerDown);
-      document.removeEventListener("keydown", handleDocumentKeyDown);
-    };
-  }, [openShopActionsID]);
-
-  useEffect(() => {
-    if (openShopActionsID === null) {
-      return;
-    }
-
-    const closeOnViewportChange = () => closeShopActions();
-    window.addEventListener("resize", closeOnViewportChange);
-    window.addEventListener("scroll", closeOnViewportChange, true);
-    return () => {
-      window.removeEventListener("resize", closeOnViewportChange);
-      window.removeEventListener("scroll", closeOnViewportChange, true);
-    };
-  }, [openShopActionsID]);
 
   useEffect(() => {
     const loadShops = async () => {
@@ -342,7 +266,6 @@ function Home() {
   };
 
   const handleClearTelegramConfig = async (shop: Shop) => {
-    closeShopActions();
     setClearingTelegramShopID(shop.id);
     try {
       const updatedShop = await updateShop(shop.id, {
@@ -368,7 +291,6 @@ function Home() {
   };
 
   const handlePingTelegram = async (shop: Shop) => {
-    closeShopActions();
     setPingingTelegramShopID(shop.id);
     try {
       await pingTelegram(shop.id);
@@ -510,72 +432,42 @@ function Home() {
                                 }
                               />
                             </div>
-                            <div className="relative" data-shop-actions>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                ref={(element) => {
-                                  shopActionButtonRefs.current[shop.id] = element;
-                                }}
-                                aria-label={`More actions for ${resolveShopLabel(shop)}`}
-                                aria-haspopup="menu"
-                                aria-expanded={openShopActionsID === shop.id}
-                                onClick={() => toggleShopActions(shop.id)}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Shop actions</span>
-                              </Button>
-                            </div>
-                            {openShopActionsID === shop.id && shopActionsPosition
-                              ? createPortal(
-                                  <div
-                                    data-shop-actions
-                                    role="menu"
-                                    aria-label={`Actions for ${resolveShopLabel(shop)}`}
-                                    className="fixed z-50 w-48 rounded-md border border-slate-200 bg-white p-1 text-left shadow-lg"
-                                    style={{
-                                      top: shopActionsPosition.top,
-                                      left: shopActionsPosition.left,
-                                    }}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label={`More actions for ${resolveShopLabel(shop)}`}
+                                >
+                                  <MoreHorizontal data-icon="inline-start" />
+                                  <span className="sr-only">Shop actions</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuGroup>
+                                  <DropdownMenuItem onSelect={() => openEditShopDialog(shop)}>
+                                    Edit Shop
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={!shop.has_telegram_config || isTelegramActionBusy}
+                                    onSelect={() => void handleClearTelegramConfig(shop)}
                                   >
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
-                                      onClick={() => {
-                                        closeShopActions();
-                                        openEditShopDialog(shop);
-                                      }}
-                                    >
-                                      Edit Shop
-                                    </button>
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      disabled={!shop.has_telegram_config || isTelegramActionBusy}
-                                      className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none disabled:pointer-events-none disabled:opacity-50"
-                                      onClick={() => void handleClearTelegramConfig(shop)}
-                                    >
-                                      {clearingTelegramShopID === shop.id
-                                        ? "Clearing..."
-                                        : "Clear Telegram"}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      disabled={!shop.has_telegram_config || isTelegramActionBusy}
-                                      className="flex w-full items-center rounded-sm px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none disabled:pointer-events-none disabled:opacity-50"
-                                      onClick={() => void handlePingTelegram(shop)}
-                                    >
-                                      {pingingTelegramShopID === shop.id
-                                        ? "Pinging..."
-                                        : "Ping Telegram"}
-                                    </button>
-                                  </div>,
-                                  document.body,
-                                )
-                              : null}
+                                    {clearingTelegramShopID === shop.id
+                                      ? "Clearing..."
+                                      : "Clear Telegram"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={!shop.has_telegram_config || isTelegramActionBusy}
+                                    onSelect={() => void handlePingTelegram(shop)}
+                                  >
+                                    {pingingTelegramShopID === shop.id
+                                      ? "Pinging..."
+                                      : "Ping Telegram"}
+                                  </DropdownMenuItem>
+                                </DropdownMenuGroup>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
