@@ -2,6 +2,25 @@
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
+## Dependency flow
+
+This browser application owns presentation and user interaction. It calls the
+authenticated Go backend through the shared Axios client; it never calls the
+MSP controller or Python stages directly.
+
+```mermaid
+graph LR
+    User[User] --> App[React and Vite application]
+    App --> Auth[Auth context and protected routes]
+    App --> Features[Shops orders products shipping]
+    Auth --> API[Axios API client]
+    Features --> API
+    API --> Backend[rimu-be-go]
+    Backend --> Shopee[(Shopee APIs)]
+    Backend --> Controller[rimu-msp controller]
+    App --> BrowserState[(Cookies and local storage)]
+```
+
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
