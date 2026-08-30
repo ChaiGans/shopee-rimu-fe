@@ -21,3 +21,7 @@ export const updateShop = async (
   const response = await api.put<ApiResponse<Shop>>(`/api/shop/${shopId}`, payload);
   return response.data.data;
 };
+
+export const pingTelegram = async (shopId: number): Promise<void> => {
+  await api.post(`/api/shop/${shopId}/telegram/ping`);
+};

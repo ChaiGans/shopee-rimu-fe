@@ -9,6 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -21,8 +28,9 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { getApiErrorMessage } from "@/lib/api-error";
-import { getShops, updateShop } from "@/services/shopService";
+import { getShops, pingTelegram, updateShop } from "@/services/shopService";
 import { Shop } from "@/types/Shop";
+import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -95,7 +103,8 @@ function Home() {
   const [telegramBotTokenInput, setTelegramBotTokenInput] = useState("");
   const [telegramChatIDInput, setTelegramChatIDInput] = useState("");
   const [isSavingShopDetails, setIsSavingShopDetails] = useState(false);
-  const [isClearingTelegramConfig, setIsClearingTelegramConfig] = useState(false);
+  const [clearingTelegramShopID, setClearingTelegramShopID] = useState<number | null>(null);
+  const [pingingTelegramShopID, setPingingTelegramShopID] = useState<number | null>(null);
   const [savingAutoShippingShopID, setSavingAutoShippingShopID] = useState<
     number | null
   >(null);
@@ -178,7 +187,6 @@ function Home() {
     setTelegramBotTokenInput("");
     setTelegramChatIDInput("");
     setIsSavingShopDetails(false);
-    setIsClearingTelegramConfig(false);
   };
 
   const handleEditDialogChange = (open: boolean) => {
@@ -188,7 +196,6 @@ function Home() {
       setTelegramBotTokenInput("");
       setTelegramChatIDInput("");
       setIsSavingShopDetails(false);
-      setIsClearingTelegramConfig(false);
     }
   };
 
@@ -258,14 +265,10 @@ function Home() {
     }
   };
 
-  const handleClearTelegramConfig = async () => {
-    if (!editingShop) {
-      return;
-    }
-
-    setIsClearingTelegramConfig(true);
+  const handleClearTelegramConfig = async (shop: Shop) => {
+    setClearingTelegramShopID(shop.id);
     try {
-      const updatedShop = await updateShop(editingShop.id, {
+      const updatedShop = await updateShop(shop.id, {
         clear_telegram_config: true,
       });
 
@@ -273,18 +276,37 @@ function Home() {
 
       toast({
         title: "Telegram Configuration Cleared",
-        description: `${resolveShopLabel(editingShop)} Telegram delivery has been removed.`,
+        description: `${resolveShopLabel(shop)} Telegram delivery has been removed.`,
         variant: "success",
       });
-
-      handleEditDialogChange(false);
     } catch (error) {
       toast({
         title: "Clear Failed",
         description: getApiErrorMessage(error, "Unable to clear Telegram configuration."),
         variant: "destructive",
       });
-      setIsClearingTelegramConfig(false);
+    } finally {
+      setClearingTelegramShopID((current) => (current === shop.id ? null : current));
+    }
+  };
+
+  const handlePingTelegram = async (shop: Shop) => {
+    setPingingTelegramShopID(shop.id);
+    try {
+      await pingTelegram(shop.id);
+      toast({
+        title: "Telegram Ping Sent",
+        description: `${resolveShopLabel(shop)} accepted the Telegram test message.`,
+        variant: "success",
+      });
+    } catch (error) {
+      toast({
+        title: "Telegram Ping Failed",
+        description: getApiErrorMessage(error, "Unable to send a Telegram test message."),
+        variant: "destructive",
+      });
+    } finally {
+      setPingingTelegramShopID((current) => (current === shop.id ? null : current));
     }
   };
 
@@ -363,6 +385,9 @@ function Home() {
                     const status = resolveTokenStatus(shop);
                     const isSavingAutoShipment =
                       savingAutoShippingShopID === shop.id;
+                    const isTelegramActionBusy =
+                      clearingTelegramShopID === shop.id ||
+                      pingingTelegramShopID === shop.id;
 
                     return (
                       <TableRow key={shop.id}>
@@ -407,13 +432,42 @@ function Home() {
                                 }
                               />
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openEditShopDialog(shop)}
-                            >
-                              Edit Shop
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label={`More actions for ${resolveShopLabel(shop)}`}
+                                >
+                                  <MoreHorizontal data-icon="inline-start" />
+                                  <span className="sr-only">Shop actions</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuGroup>
+                                  <DropdownMenuItem onSelect={() => openEditShopDialog(shop)}>
+                                    Edit Shop
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={!shop.has_telegram_config || isTelegramActionBusy}
+                                    onSelect={() => void handleClearTelegramConfig(shop)}
+                                  >
+                                    {clearingTelegramShopID === shop.id
+                                      ? "Clearing..."
+                                      : "Clear Telegram"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={!shop.has_telegram_config || isTelegramActionBusy}
+                                    onSelect={() => void handlePingTelegram(shop)}
+                                  >
+                                    {pingingTelegramShopID === shop.id
+                                      ? "Pinging..."
+                                      : "Ping Telegram"}
+                                  </DropdownMenuItem>
+                                </DropdownMenuGroup>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -452,7 +506,7 @@ function Home() {
                 placeholder="e.g. Rimu Medan Main Store"
                 value={shopNameInput}
                 onChange={(event) => setShopNameInput(event.target.value)}
-                disabled={isSavingShopDetails || isClearingTelegramConfig}
+                disabled={isSavingShopDetails}
               />
             </div>
 
@@ -466,7 +520,7 @@ function Home() {
                 placeholder="Enter a new bot token to set or replace"
                 value={telegramBotTokenInput}
                 onChange={(event) => setTelegramBotTokenInput(event.target.value)}
-                disabled={isSavingShopDetails || isClearingTelegramConfig}
+                disabled={isSavingShopDetails}
               />
             </div>
 
@@ -479,31 +533,22 @@ function Home() {
                 placeholder="e.g. -1001234567890"
                 value={telegramChatIDInput}
                 onChange={(event) => setTelegramChatIDInput(event.target.value)}
-                disabled={isSavingShopDetails || isClearingTelegramConfig}
+                disabled={isSavingShopDetails}
               />
             </div>
           </div>
 
           <DialogFooter className="gap-2">
-            {editingShop?.has_telegram_config ? (
-              <Button
-                variant="outline"
-                onClick={() => void handleClearTelegramConfig()}
-                disabled={isSavingShopDetails || isClearingTelegramConfig}
-              >
-                {isClearingTelegramConfig ? "Clearing..." : "Clear Telegram"}
-              </Button>
-            ) : null}
             <Button
               variant="outline"
               onClick={() => handleEditDialogChange(false)}
-              disabled={isSavingShopDetails || isClearingTelegramConfig}
+              disabled={isSavingShopDetails}
             >
               Cancel
             </Button>
             <Button
               onClick={() => void handleSaveShopDetails()}
-              disabled={isSavingShopDetails || isClearingTelegramConfig}
+              disabled={isSavingShopDetails}
             >
               {isSavingShopDetails ? "Saving..." : "Save Changes"}
             </Button>
