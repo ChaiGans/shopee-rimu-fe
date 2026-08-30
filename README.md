@@ -2,7 +2,7 @@
 
 ## Shop Telegram actions
 
-The authenticated shop table exposes one three-dot actions menu per shop. It
+The authenticated shop table exposes one shadcn/ui three-dot `DropdownMenu` per shop. It
 keeps shop editing, Telegram configuration removal, and Telegram connectivity
 testing together. `Ping Telegram` sends no credentials from the browser; the
 backend loads the encrypted destination for the owned shop and reports whether
