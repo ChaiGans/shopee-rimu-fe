@@ -24,7 +24,3 @@ dist-ssr
 *.sw?
 
 .env
-
-# Local agent skills
-.agents/
-skills-lock.json
