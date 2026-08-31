@@ -34,10 +34,14 @@ export async function run(page) {
 
   page.setDefaultTimeout(30_000);
 
-  if (await page.getByLabel("Username", { exact: true }).count()) {
-    await page.getByLabel("Username", { exact: true }).fill(username);
+  const usernameInput = page.getByLabel("Username", { exact: true });
+  try {
+    await usernameInput.waitFor({ state: "visible", timeout: 5_000 });
+    await usernameInput.fill(username);
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Login", exact: true }).click();
+  } catch {
+    // AuthProvider may already have an authenticated session.
   }
 
   await page.getByRole("link", { name: "MSP Procurement", exact: true }).click();
