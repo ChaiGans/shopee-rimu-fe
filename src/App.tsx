@@ -10,6 +10,7 @@ import NettProfitGenerator from "./pages/NettProfitGenerator";
 import AutoShippingConfig from "./pages/AutoShippingConfig";
 import WarehousePerhitunganSelisih from "./pages/WarehousePerhitunganSelisih";
 import WarehouseProducts from "./pages/WarehouseProducts";
+import MspPipeline from "./pages/MspPipeline";
 
 function App() {
   return (
@@ -33,6 +34,14 @@ function App() {
             element={
               <ProtectedRouteProvider>
                 <NettProfitGenerator />
+              </ProtectedRouteProvider>
+            }
+          />
+          <Route
+            path="msp"
+            element={
+              <ProtectedRouteProvider>
+                <MspPipeline />
               </ProtectedRouteProvider>
             }
           />

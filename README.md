@@ -27,6 +27,39 @@ graph LR
 shop record with `clear_telegram_config`; `Ping Telegram` calls
 `POST /api/shop/:shop_id/telegram/ping` and shows success or failure in a toast.
 
+## MSP E2E procurement workbench
+
+Authenticated operators can open `/msp` to upload the reviewed 1688-to-Shopee
+mapping, supplier profile, SKU master, and business constraint CSVs. The
+frontend sends them to `rimu-be-go` through one multipart upload-and-start
+request. The backend owns shared-volume paths, Shopee stock and sales
+preparation, and controller communication; the browser never calls the MSP
+controller directly or receives service credentials.
+
+```mermaid
+graph LR
+    User[Authenticated operator] --> Workbench[MSP workbench]
+    Workbench --> Upload[Multipart CSV upload and policy config]
+    Upload --> Backend[rimu-be-go]
+    Backend --> Shopee[(Shopee APIs)]
+    Backend --> Volume[(Shared pipeline volume)]
+    Backend --> Controller[rimu-msp controller]
+    Controller --> Stages[Sales Forecasting -> Order Replenishment -> SSOA]
+    Controller --> Backend
+    Backend --> History[(Pipeline run projection)]
+    History --> Workbench
+    Workbench --> Artifacts[Stage results and artifact previews]
+```
+
+## MSP E2E proof
+
+The live flow is defined in `e2e/msp-workbench-flow.mjs`. It reads the staging
+login and four CSV paths from `RIMU_E2E_USERNAME`, `RIMU_E2E_PASSWORD`,
+`RIMU_E2E_ORDER_MAPPING_FILE`, `RIMU_E2E_SUPPLIER_INFO_FILE`,
+`RIMU_E2E_SKU_MASTER_FILE`, and `RIMU_E2E_BUSINESS_CONSTRAINTS_FILE`.
+Run it through the workspace recorder against the deployed staging frontend;
+do not commit those values or source files.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 ## Dependency flow

@@ -25,6 +25,7 @@ import {
   Truck,
   WashingMachine,
   Boxes,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
@@ -110,6 +111,17 @@ export function AppSidebar() {
           path: "/utilities/nett-profit-generator",
           label: "Nett Profit Generator",
           icon: WashingMachine,
+          authOnly: true,
+        },
+      ],
+    },
+    {
+      label: "Procurement",
+      items: [
+        {
+          path: "/msp",
+          label: "MSP Procurement",
+          icon: Workflow,
           authOnly: true,
         },
       ],
