@@ -18,6 +18,10 @@
 - Reuse an existing outer constant/helper before creating a new local copy.
 - Use the existing shadcn/ui primitives for shared UI patterns. For status tags,
   use `Badge`; do not recreate a pill with a custom `<span>`.
+- Keep component spacing, icon sizing, typography, and state colors inside the
+  design-system primitive or semantic theme tokens. Call sites should use
+  component props/variants and data attributes, not per-instance utility tokens
+  such as `gap-1`, `h-3.5`, or raw color classes.
 
 ## Boundaries
 

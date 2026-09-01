@@ -25,6 +25,45 @@
 
 @layer base {
   :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --rimu-badge-gap: 0.25rem;
+    --rimu-badge-icon-size: 0.75rem;
+    --rimu-badge-padding-x: 0.625rem;
+    --rimu-badge-padding-y: 0.125rem;
+    --rimu-badge-font-size: 0.75rem;
+    --rimu-badge-font-weight: 600;
+    --status-pending: 210 40% 96.1%;
+    --status-pending-foreground: 215.4 16.3% 46.9%;
+    --status-pending-border: 214.3 31.8% 91.4%;
+    --status-queued: 48 96% 89%;
+    --status-queued-foreground: 32 95% 30%;
+    --status-queued-border: 48 96% 78%;
+    --status-running: 214 95% 93%;
+    --status-running-foreground: 221 83% 33%;
+    --status-running-border: 214 95% 80%;
+    --status-succeeded: 152 76% 91%;
+    --status-succeeded-foreground: 160 84% 28%;
+    --status-succeeded-border: 152 76% 75%;
+    --status-failed: 0 86% 93%;
+    --status-failed-foreground: 0 72% 42%;
+    --status-failed-border: 0 86% 82%;
+    --status-cancelled: 210 20% 93%;
+    --status-cancelled-foreground: 215 16% 38%;
+    --status-cancelled-border: 210 20% 84%;
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
     --sidebar-primary: oklch(0.205 0 0);
@@ -36,6 +75,39 @@
   }
 
   .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --status-pending: 217.2 32.6% 17.5%;
+    --status-pending-foreground: 215 20.2% 65.1%;
+    --status-pending-border: 217.2 32.6% 24%;
+    --status-queued: 32 81% 22%;
+    --status-queued-foreground: 48 96% 89%;
+    --status-queued-border: 32 81% 35%;
+    --status-running: 221 83% 25%;
+    --status-running-foreground: 214 95% 93%;
+    --status-running-border: 221 83% 40%;
+    --status-succeeded: 160 84% 20%;
+    --status-succeeded-foreground: 152 76% 91%;
+    --status-succeeded-border: 160 84% 34%;
+    --status-failed: 0 62.8% 22%;
+    --status-failed-foreground: 0 86% 93%;
+    --status-failed-border: 0 62.8% 38%;
+    --status-cancelled: 217.2 20% 24%;
+    --status-cancelled-foreground: 215 20.2% 75%;
+    --status-cancelled-border: 217.2 20% 35%;
     --sidebar: oklch(0.205 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
     --sidebar-primary: oklch(0.488 0.243 264.376);

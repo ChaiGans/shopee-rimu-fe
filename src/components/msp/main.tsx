@@ -112,11 +112,10 @@ function StatusBadge({ status }: { status: NormalizedStageStatus | PipelineRunSt
   return (
     <Badge
       variant={statusBadgeVariant(normalized)}
-      className="gap-1"
       data-status={normalized}
     >
       {normalized === "running" || normalized === "queued" ? (
-        <Loader2 data-icon="inline-start" className="animate-spin" />
+        <Loader2 data-icon="inline-start" />
       ) : normalized === "succeeded" ? (
         <CheckCircle2 data-icon="inline-start" />
       ) : normalized === "failed" ? (

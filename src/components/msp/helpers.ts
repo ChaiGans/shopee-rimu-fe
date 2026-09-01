@@ -66,24 +66,10 @@ export const statusLabel = (status: NormalizedStageStatus | PipelineRunStatus): 
   }
 };
 
-export type StatusBadgeVariant = "default" | "secondary" | "destructive" | "outline";
+export type StatusBadgeVariant = NormalizedStageStatus;
 
-export const statusBadgeVariant = (status: NormalizedStageStatus | PipelineRunStatus): StatusBadgeVariant => {
-  switch (normalizeStageStatus(status)) {
-    case "queued":
-      return "secondary";
-    case "running":
-      return "default";
-    case "succeeded":
-      return "secondary";
-    case "failed":
-      return "destructive";
-    case "cancelled":
-      return "outline";
-    default:
-      return "outline";
-  }
-};
+export const statusBadgeVariant = (status: NormalizedStageStatus | PipelineRunStatus): StatusBadgeVariant =>
+  normalizeStageStatus(status);
 
 export const formatDate = (value?: string | null): string => {
   if (!value) {
