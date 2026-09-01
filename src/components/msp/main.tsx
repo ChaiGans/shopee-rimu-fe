@@ -4,6 +4,7 @@ import {
   Ban,
   CheckCircle2,
   Circle,
+  Download,
   FileText,
   Loader2,
   RefreshCw,
@@ -93,6 +94,7 @@ import {
   buildPipelineConfig,
   formatBytes,
   formatDate,
+  downloadCsvTemplate,
   formatShopName,
   formatShopOption,
   formatValue,
@@ -154,6 +156,10 @@ function UploadField({
     <div className="space-y-2 rounded-lg border border-dashed border-slate-300 p-4">
       <Label htmlFor={id}>{field.label}</Label>
       <p className="text-xs text-slate-500">{field.description}</p>
+      <Button type="button" variant="link" size="sm" onClick={() => downloadCsvTemplate(field.template)} data-testid={`msp-template-${field.key}`}>
+        <Download data-icon="inline-start" />
+        {MSP_TEXT.form.downloadTemplate}
+      </Button>
       <Input
         id={id}
         type="file"
