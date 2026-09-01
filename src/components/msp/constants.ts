@@ -47,6 +47,67 @@ export const SUPPLIER_CONSTRAINT_OPTIONS = [
   { value: "false", label: "Disabled" },
 ] as const;
 
+export interface MspCsvTemplate {
+  fileName: string;
+  headers: readonly string[];
+}
+
+export const MSP_CSV_TEMPLATES: Record<MspUploadFileKey, MspCsvTemplate> = {
+  orderMapping: {
+    fileName: "order_mapping_template.csv",
+    headers: [
+      "order_number",
+      "shopee_item_sku",
+      "shopee_model_sku",
+      "quantity_purchased",
+      "purchase_price",
+      "supplier",
+      "product_url",
+      "order_date",
+      "forwarder_receive_date",
+      "review_status",
+      "manual_override_item_sku",
+      "manual_override_model_sku",
+    ],
+  },
+  supplierInfo: {
+    fileName: "supplier_info_template.csv",
+    headers: [
+      "supplier_name",
+      "after_sales_experience",
+      "product_experience",
+      "logistics_experience",
+      "consultation_experience",
+      "repeat_purchase_rate",
+      "security_deposit",
+      "trade_medal",
+      "platform_age",
+      "min_order_price_rmb",
+      "max_order_price_rmb",
+    ],
+  },
+  skuMaster: {
+    fileName: "sku_master_template.csv",
+    headers: [
+      "sku_rep",
+      "selling_price_idr",
+      "box_length_cm3",
+      "box_width_cm3",
+      "box_height_cm3",
+      "qty_per_box",
+    ],
+  },
+  businessConstraints: {
+    fileName: "business_constraints_template.csv",
+    headers: [
+      "sku_rep",
+      "supplier_name",
+      "min_order_quantity",
+      "max_order_quantity",
+    ],
+  },
+};
+
 export const PIPELINE_STAGES: Array<{
   key: PipelineStage;
   label: string;
@@ -113,30 +174,35 @@ export const UPLOAD_FIELDS: Array<{
   fieldName: string;
   label: string;
   description: string;
+  template: MspCsvTemplate;
 }> = [
   {
     key: "orderMapping",
     fieldName: "order_mapping",
     label: "Reviewed order mapping CSV",
     description: "The approved 1688-to-Shopee mapper export.",
+    template: MSP_CSV_TEMPLATES.orderMapping,
   },
   {
     key: "supplierInfo",
     fieldName: "supplier_info",
     label: "Supplier profile CSV",
     description: "Supplier experience, pricing, and platform profile data.",
+    template: MSP_CSV_TEMPLATES.supplierInfo,
   },
   {
     key: "skuMaster",
     fieldName: "sku_master",
     label: "SKU master CSV",
     description: "Shopee SKU pricing and package dimensions.",
+    template: MSP_CSV_TEMPLATES.skuMaster,
   },
   {
     key: "businessConstraints",
     fieldName: "business_constraints",
     label: "Business constraints CSV",
     description: "Supplier/SKU minimum and maximum order quantities.",
+    template: MSP_CSV_TEMPLATES.businessConstraints,
   },
 ];
 
@@ -171,6 +237,7 @@ export const MSP_TEXT = {
     reconnectNotice: "This shop has no active Shopee token. Reconnect it from Home before starting.",
     noShop: "No connected Shopee shop is available. Connect a shop from Home first.",
     noSelectedFile: "No file selected",
+    downloadTemplate: "Download CSV template",
     csvOnly: "All MSP input files must use the .csv format.",
     selectFiles: "Select all four CSV files before starting the pipeline.",
     selectShop: "Select a connected Shopee shop first.",
