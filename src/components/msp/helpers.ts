@@ -66,20 +66,22 @@ export const statusLabel = (status: NormalizedStageStatus | PipelineRunStatus): 
   }
 };
 
-export const statusClassName = (status: NormalizedStageStatus | PipelineRunStatus): string => {
+export type StatusBadgeVariant = "default" | "secondary" | "destructive" | "outline";
+
+export const statusBadgeVariant = (status: NormalizedStageStatus | PipelineRunStatus): StatusBadgeVariant => {
   switch (normalizeStageStatus(status)) {
     case "queued":
-      return "bg-amber-100 text-amber-800";
+      return "secondary";
     case "running":
-      return "bg-blue-100 text-blue-800";
+      return "default";
     case "succeeded":
-      return "bg-emerald-100 text-emerald-800";
+      return "secondary";
     case "failed":
-      return "bg-red-100 text-red-800";
+      return "destructive";
     case "cancelled":
-      return "bg-slate-200 text-slate-700";
+      return "outline";
     default:
-      return "bg-slate-100 text-slate-600";
+      return "outline";
   }
 };
 

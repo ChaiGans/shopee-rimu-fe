@@ -100,7 +100,7 @@ import {
   isCsvFile,
   jsonText,
   normalizeStageStatus,
-  statusClassName,
+  statusBadgeVariant,
   statusLabel,
   type NormalizedStageStatus,
 } from "./helpers";
@@ -111,20 +111,20 @@ function StatusBadge({ status }: { status: NormalizedStageStatus | PipelineRunSt
   const normalized = normalizeStageStatus(status);
   return (
     <Badge
-      variant="outline"
-      className={`gap-1 py-1 ${statusClassName(normalized)}`}
+      variant={statusBadgeVariant(normalized)}
+      className="gap-1"
       data-status={normalized}
     >
       {normalized === "running" || normalized === "queued" ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        <Loader2 data-icon="inline-start" className="animate-spin" />
       ) : normalized === "succeeded" ? (
-        <CheckCircle2 className="h-3.5 w-3.5" />
+        <CheckCircle2 data-icon="inline-start" />
       ) : normalized === "failed" ? (
-        <XCircle className="h-3.5 w-3.5" />
+        <XCircle data-icon="inline-start" />
       ) : normalized === "cancelled" ? (
-        <Ban className="h-3.5 w-3.5" />
+        <Ban data-icon="inline-start" />
       ) : (
-        <Circle className="h-3.5 w-3.5" />
+        <Circle data-icon="inline-start" />
       )}
       {statusLabel(normalized)}
     </Badge>
