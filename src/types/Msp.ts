@@ -171,3 +171,24 @@ export interface ShopeePipelineUploadFiles {
   skuMaster: File;
   businessConstraints: File;
 }
+
+export type MspNumericPolicyKey =
+  | "rmb_to_idr_rate"
+  | "volume_cost_rate"
+  | "netsell_multiplier"
+  | "netsell_fixed_cost"
+  | "fallback_hpp_multiplier"
+  | "top_k"
+  | "business_capital"
+  | "warehouse_capacity"
+  | "warehouse_cost_per_volume"
+  | "demand_tolerance_alpha"
+  | "demand_tolerance_beta"
+  | "overbuy_risk_multiplier";
+
+export type MspPolicyValues = Record<MspNumericPolicyKey, string> & {
+  milp_selection_method: string;
+  enforce_supplier_order_price_constraints: "default" | "true" | "false";
+};
+
+export type MspUploadFileKey = keyof ShopeePipelineUploadFiles;

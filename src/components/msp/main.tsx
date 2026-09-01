@@ -48,7 +48,10 @@ import {
   uploadAndStartPipeline,
 } from "@/services/mspService";
 import { getShops } from "@/services/shopService";
-import {
+import type {
+  MspNumericPolicyKey,
+  MspPolicyValues,
+  MspUploadFileKey,
   PipelineRunArtifact,
   PipelineRunArtifactContent,
   PipelineRunListItem,
@@ -58,295 +61,50 @@ import {
   PipelineRunStatus,
   PipelineRunView,
   PipelineStage,
-  ShopeePipelineUploadFiles,
 } from "@/types/Msp";
 import { Shop } from "@/types/Shop";
+import {
+  CSV_FILE_ACCEPT,
+  DEFAULT_LOOKBACK_DAYS,
+  EMPTY_DISPLAY_VALUE,
+  EMPTY_TEXT,
+  HISTORY_PAGE_SIZE,
+  INITIAL_POLICY,
+  MAX_LOOKBACK_DAYS,
+  MAX_ARTIFACT_PREVIEW_ROWS,
+  MILP_SELECTION_METHOD_OPTIONS,
+  MIN_LOOKBACK_DAYS,
+  MIN_NONNEGATIVE_VALUE,
+  MSP_ELEMENT_IDS,
+  MSP_ELEMENT_ID_PREFIXES,
+  MSP_TEXT,
+  NUMERIC_POLICY_FIELDS,
+  NUMBER_INPUT_STEP,
+  PIPELINE_STAGES,
+  POLL_DELAY_MS,
+  RUN_QUERY_PARAM,
+  SELECTED_SHOP_STORAGE_KEY,
+  SHOPEE_MARKETPLACE,
+  SUPPLIER_CONSTRAINT_OPTIONS,
+  UPLOAD_FIELDS,
+} from "./constants";
+import {
+  buildPipelineConfig,
+  formatBytes,
+  formatDate,
+  formatShopName,
+  formatShopOption,
+  formatValue,
+  isActiveStatus,
+  isCsvFile,
+  jsonText,
+  normalizeStageStatus,
+  statusClassName,
+  statusLabel,
+  type NormalizedStageStatus,
+} from "./helpers";
 
-const SELECTED_SHOP_STORAGE_KEY = "msp_selected_shop_id";
-const HISTORY_PAGE_SIZE = 20;
-const POLL_DELAY_MS = 3000;
-const MAX_ARTIFACT_PREVIEW_ROWS = 200;
-
-const PIPELINE_STAGES: Array<{
-  key: PipelineStage;
-  label: string;
-  description: string;
-}> = [
-  {
-    key: "SALES_FORECASTING",
-    label: "Sales Forecasting",
-    description: "Forecast demand from the Shopee sales history.",
-  },
-  {
-    key: "ORDER_REPLENISHMENT",
-    label: "Order Replenishment",
-    description: "Turn forecast demand and current stock into purchase quantities.",
-  },
-  {
-    key: "SSOA",
-    label: "Supplier Selection",
-    description: "Rank suppliers and allocate the recommended procurement order.",
-  },
-];
-
-const NUMERIC_POLICY_FIELDS = [
-  { key: "rmb_to_idr_rate", label: "RMB → IDR rate", rule: "positive", placeholder: "2300" },
-  { key: "volume_cost_rate", label: "Volume cost rate", rule: "nonnegative", placeholder: "0" },
-  { key: "netsell_multiplier", label: "Net-selling multiplier", rule: "positive", placeholder: "0.95" },
-  { key: "netsell_fixed_cost", label: "Net-selling fixed cost", rule: "nonnegative", placeholder: "0" },
-  { key: "fallback_hpp_multiplier", label: "Fallback HPP multiplier", rule: "positive", placeholder: "1.2" },
-  { key: "top_k", label: "Top-K suppliers", rule: "integer", placeholder: "10" },
-  { key: "business_capital", label: "Business capital", rule: "positive", placeholder: "1000000" },
-  { key: "warehouse_capacity", label: "Warehouse capacity", rule: "positive", placeholder: "1000" },
-  { key: "warehouse_cost_per_volume", label: "Warehouse cost per volume", rule: "nonnegative", placeholder: "0" },
-  { key: "demand_tolerance_alpha", label: "Demand tolerance α", rule: "nonnegative", placeholder: "0.9" },
-  { key: "demand_tolerance_beta", label: "Demand tolerance β", rule: "nonnegative", placeholder: "1.1" },
-  { key: "overbuy_risk_multiplier", label: "Overbuy risk multiplier", rule: "nonnegative", placeholder: "1.0" },
-] as const;
-
-type NumericPolicyKey = (typeof NUMERIC_POLICY_FIELDS)[number]["key"];
-type PolicyValues = Record<NumericPolicyKey, string> & {
-  milp_selection_method: string;
-  enforce_supplier_order_price_constraints: "default" | "true" | "false";
-};
-type UploadFileKey = keyof ShopeePipelineUploadFiles;
-type UploadFileState = Record<UploadFileKey, File | null>;
-type NormalizedStageStatus = "pending" | "queued" | "running" | "succeeded" | "failed" | "cancelled";
-
-const INITIAL_POLICY: PolicyValues = {
-  milp_selection_method: "MOST_FREQUENT",
-  rmb_to_idr_rate: "",
-  volume_cost_rate: "",
-  netsell_multiplier: "",
-  netsell_fixed_cost: "",
-  fallback_hpp_multiplier: "",
-  top_k: "",
-  business_capital: "",
-  warehouse_capacity: "",
-  warehouse_cost_per_volume: "",
-  demand_tolerance_alpha: "",
-  demand_tolerance_beta: "",
-  overbuy_risk_multiplier: "",
-  enforce_supplier_order_price_constraints: "default",
-};
-
-const UPLOAD_FIELDS: Array<{
-  key: UploadFileKey;
-  fieldName: string;
-  label: string;
-  description: string;
-}> = [
-  {
-    key: "orderMapping",
-    fieldName: "order_mapping",
-    label: "Reviewed order mapping CSV",
-    description: "The approved 1688-to-Shopee mapper export.",
-  },
-  {
-    key: "supplierInfo",
-    fieldName: "supplier_info",
-    label: "Supplier profile CSV",
-    description: "Supplier experience, pricing, and platform profile data.",
-  },
-  {
-    key: "skuMaster",
-    fieldName: "sku_master",
-    label: "SKU master CSV",
-    description: "Shopee SKU pricing and package dimensions.",
-  },
-  {
-    key: "businessConstraints",
-    fieldName: "business_constraints",
-    label: "Business constraints CSV",
-    description: "Supplier/SKU minimum and maximum order quantities.",
-  },
-];
-
-const isActiveStatus = (status: unknown): boolean => {
-  const normalized = String(status ?? "").toLowerCase();
-  return normalized === "queued" || normalized === "running";
-};
-
-const normalizeStageStatus = (status: unknown): NormalizedStageStatus => {
-  switch (String(status ?? "").toLowerCase()) {
-    case "queued":
-      return "queued";
-    case "running":
-      return "running";
-    case "succeeded":
-    case "finished":
-    case "completed":
-      return "succeeded";
-    case "failed":
-      return "failed";
-    case "cancelled":
-    case "canceled":
-      return "cancelled";
-    default:
-      return "pending";
-  }
-};
-
-const statusLabel = (status: NormalizedStageStatus | PipelineRunStatus): string => {
-  switch (normalizeStageStatus(status)) {
-    case "queued":
-      return "Queued";
-    case "running":
-      return "Running";
-    case "succeeded":
-      return "Succeeded";
-    case "failed":
-      return "Failed";
-    case "cancelled":
-      return "Cancelled";
-    default:
-      return "Pending";
-  }
-};
-
-const statusClassName = (status: NormalizedStageStatus | PipelineRunStatus): string => {
-  switch (normalizeStageStatus(status)) {
-    case "queued":
-      return "bg-amber-100 text-amber-800";
-    case "running":
-      return "bg-blue-100 text-blue-800";
-    case "succeeded":
-      return "bg-emerald-100 text-emerald-800";
-    case "failed":
-      return "bg-red-100 text-red-800";
-    case "cancelled":
-      return "bg-slate-200 text-slate-700";
-    default:
-      return "bg-slate-100 text-slate-600";
-  }
-};
-
-const formatDate = (value?: string | null): string => {
-  if (!value) {
-    return "-";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-};
-
-const formatBytes = (value: number): string => {
-  if (value < 1024) {
-    return `${value} B`;
-  }
-  if (value < 1024 * 1024) {
-    return `${(value / 1024).toFixed(1)} KB`;
-  }
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const formatValue = (value: unknown): string => {
-  if (value === null || value === undefined || value === "") {
-    return "-";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-};
-
-const jsonText = (value: unknown): string => {
-  if (value === null || value === undefined) {
-    return "-";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  try {
-    return JSON.stringify(value, null, 2) ?? "-";
-  } catch {
-    return String(value);
-  }
-};
-
-const buildPipelineConfig = ({
-  lookbackDays,
-  useDateRange,
-  rangeStart,
-  rangeEnd,
-  forceRefresh,
-  policy,
-}: {
-  lookbackDays: string;
-  useDateRange: boolean;
-  rangeStart: string;
-  rangeEnd: string;
-  forceRefresh: boolean;
-  policy: PolicyValues;
-}): { config: Record<string, unknown> | null; error: string | null } => {
-  const config: Record<string, unknown> = {};
-  if (useDateRange) {
-    if (!rangeStart || !rangeEnd) {
-      return { config: null, error: "Both sales history dates are required." };
-    }
-    if (rangeEnd < rangeStart) {
-      return { config: null, error: "Sales history end date must be on or after the start date." };
-    }
-    config.range_start = rangeStart;
-    config.range_end = rangeEnd;
-  } else {
-    const parsedLookback = Number(lookbackDays);
-    if (!Number.isInteger(parsedLookback) || parsedLookback < 1 || parsedLookback > 730) {
-      return { config: null, error: "Lookback must be a whole number between 1 and 730 days." };
-    }
-    config.lookback_days = parsedLookback;
-  }
-  if (forceRefresh) {
-    config.force_refresh = true;
-  }
-
-  const selectionMethod = policy.milp_selection_method.trim();
-  if (!selectionMethod) {
-    return { config: null, error: "MILP selection method is required." };
-  }
-  const additionalSettings: Record<string, unknown> = {
-    milp_selection_method: selectionMethod,
-  };
-  for (const field of NUMERIC_POLICY_FIELDS) {
-    const rawValue = policy[field.key].trim();
-    if (rawValue === "") {
-      continue;
-    }
-    const value = Number(rawValue);
-    if (!Number.isFinite(value)) {
-      return { config: null, error: `${field.label} must be a finite number.` };
-    }
-    if (field.rule === "positive" && value <= 0) {
-      return { config: null, error: `${field.label} must be greater than zero.` };
-    }
-    if (field.rule === "nonnegative" && value < 0) {
-      return { config: null, error: `${field.label} must be zero or greater.` };
-    }
-    if (field.rule === "integer" && (!Number.isInteger(value) || value < 1)) {
-      return { config: null, error: `${field.label} must be a positive whole number.` };
-    }
-    additionalSettings[field.key] = value;
-  }
-  if (policy.enforce_supplier_order_price_constraints !== "default") {
-    additionalSettings.enforce_supplier_order_price_constraints =
-      policy.enforce_supplier_order_price_constraints === "true";
-  }
-  config.additional_settings = additionalSettings;
-
-  return { config, error: null };
-};
+type UploadFileState = Record<MspUploadFileKey, File | null>;
 
 function StatusPill({ status }: { status: NormalizedStageStatus | PipelineRunStatus }) {
   const normalized = normalizeStageStatus(status);
@@ -390,7 +148,7 @@ function UploadField({
   disabled: boolean;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
-  const id = `msp-upload-${field.fieldName}`;
+  const id = `${MSP_ELEMENT_ID_PREFIXES.upload}-${field.fieldName}`;
   return (
     <div className="space-y-2 rounded-lg border border-dashed border-slate-300 p-4">
       <Label htmlFor={id}>{field.label}</Label>
@@ -398,13 +156,13 @@ function UploadField({
       <Input
         id={id}
         type="file"
-        accept=".csv,text/csv"
+        accept={CSV_FILE_ACCEPT}
         onChange={onChange}
         disabled={disabled}
       />
       <p className="flex items-center gap-1 text-xs text-slate-600" aria-live="polite">
         <FileText className="h-3.5 w-3.5" />
-        {file ? `${file.name} · ${formatBytes(file.size)}` : "No file selected"}
+        {file ? `${file.name} · ${formatBytes(file.size)}` : MSP_TEXT.form.noSelectedFile}
       </p>
     </div>
   );
@@ -448,7 +206,7 @@ function StageResultCard({
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <div>
           <CardTitle className="text-lg">{result.label || result.stage}</CardTitle>
-          <CardDescription>{result.summary || "No stage summary returned."}</CardDescription>
+          <CardDescription>{result.summary || MSP_TEXT.detail.noStageSummary}</CardDescription>
         </div>
         <StatusPill status={result.status} />
       </CardHeader>
@@ -459,7 +217,7 @@ function StageResultCard({
               <div key={`${metric.label}-${formatValue(metric.value)}`} className="rounded-md border p-3">
                 <div className="text-xs text-slate-500">{metric.label}</div>
                 <div className="mt-1 font-semibold">
-                  {formatValue(metric.value)} {metric.unit ?? ""}
+                  {formatValue(metric.value)} {metric.unit ?? EMPTY_TEXT}
                 </div>
               </div>
             ))}
@@ -468,7 +226,7 @@ function StageResultCard({
 
         {result.warnings && result.warnings.length > 0 ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <div className="font-semibold">Warnings</div>
+            <div className="font-semibold">{MSP_TEXT.detail.warnings}</div>
             <ul className="mt-1 list-disc pl-5">
               {result.warnings.map((warning) => (
                 <li key={warning}>{warning}</li>
@@ -479,14 +237,14 @@ function StageResultCard({
 
         {result.error && Object.keys(result.error).length > 0 ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            <div className="font-semibold">Stage error</div>
+            <div className="font-semibold">{MSP_TEXT.detail.stageError}</div>
             <JsonPanel value={result.error} />
           </div>
         ) : null}
 
         {result.explanations?.length > 0 ? (
           <div className="space-y-2">
-            <div className="text-sm font-semibold">How this stage works</div>
+            <div className="text-sm font-semibold">{MSP_TEXT.detail.howItWorks}</div>
             {result.explanations.map((explanation) => (
               <div key={`${explanation.title}-${explanation.body}`} className="rounded-md bg-slate-50 p-3 text-sm">
                 <div className="font-medium">{explanation.title}</div>
@@ -498,7 +256,7 @@ function StageResultCard({
 
         {result.decision_summary && Object.keys(result.decision_summary).length > 0 ? (
           <div className="space-y-2">
-            <div className="text-sm font-semibold">Decision summary</div>
+            <div className="text-sm font-semibold">{MSP_TEXT.detail.decisionSummary}</div>
             <JsonPanel value={result.decision_summary} />
           </div>
         ) : null}
@@ -555,7 +313,7 @@ function StageResultCard({
 
         {artifacts.length > 0 ? (
           <div className="space-y-2">
-            <div className="text-sm font-semibold">Artifacts</div>
+            <div className="text-sm font-semibold">{MSP_TEXT.detail.artifacts}</div>
             <div className="flex flex-wrap gap-2">
               {artifacts.map((artifact) => (
                 <StageArtifactButton key={`${artifact.role}-${artifact.artifact_name}`} artifact={artifact} onPreview={onPreview} />
@@ -589,29 +347,29 @@ function PipelineRunHistory({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <div>
-          <CardTitle className="text-lg">Recent runs</CardTitle>
-          <CardDescription>Open a run to resume status polling.</CardDescription>
+          <CardTitle className="text-lg">{MSP_TEXT.history.title}</CardTitle>
+          <CardDescription>{MSP_TEXT.history.description}</CardDescription>
         </div>
         <Button type="button" size="sm" variant="outline" onClick={onRefresh} disabled={loading}>
           <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-          Refresh
+          {MSP_TEXT.detail.refresh}
         </Button>
       </CardHeader>
       <CardContent>
         {loading ? (
           <Loading />
         ) : runs.length === 0 ? (
-          <p className="text-sm text-slate-500">No MSP runs for this shop yet.</p>
+          <p className="text-sm text-slate-500">{MSP_TEXT.history.noRuns}</p>
         ) : (
           <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Run</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Stage</TableHead>
-                    <TableHead>Updated</TableHead>
+                    <TableHead>{MSP_TEXT.history.run}</TableHead>
+                    <TableHead>{MSP_TEXT.history.status}</TableHead>
+                    <TableHead>{MSP_TEXT.history.stage}</TableHead>
+                    <TableHead>{MSP_TEXT.history.updated}</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -630,7 +388,7 @@ function PipelineRunHistory({
                           onClick={() => onOpen(run.pipeline_run_id)}
                           aria-label={`Open run ${run.pipeline_run_id}`}
                         >
-                          Open
+                          {MSP_TEXT.history.open}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -641,11 +399,11 @@ function PipelineRunHistory({
             {totalPages > 1 ? (
               <div className="mt-4 flex items-center justify-between text-sm">
                 <Button type="button" size="sm" variant="outline" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
-                  Previous
+                  {MSP_TEXT.history.previous}
                 </Button>
-                <span>Page {page} of {totalPages}</span>
+                <span>{MSP_TEXT.history.page} {page} {MSP_TEXT.history.pageOf} {totalPages}</span>
                 <Button type="button" size="sm" variant="outline" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
-                  Next
+                  {MSP_TEXT.history.next}
                 </Button>
               </div>
             ) : null}
@@ -702,18 +460,18 @@ function PipelineRunDetail({
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <div>
-          <CardTitle className="text-lg">Run details</CardTitle>
-          <CardDescription>Controller-backed execution and stage evidence.</CardDescription>
+          <CardTitle className="text-lg">{MSP_TEXT.detail.title}</CardTitle>
+          <CardDescription>{MSP_TEXT.detail.description}</CardDescription>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           <Button type="button" size="sm" variant="outline" onClick={onRefresh} disabled={loading}>
             <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-            Refresh
+            {MSP_TEXT.detail.refresh}
           </Button>
           {run && isActiveStatus(run.status) ? (
             <Button type="button" size="sm" variant="destructive" onClick={onCancel}>
               <StopCircle className="h-4 w-4" />
-              Cancel
+              {MSP_TEXT.detail.cancel}
             </Button>
           ) : null}
         </div>
@@ -730,16 +488,16 @@ function PipelineRunDetail({
             <div className="flex flex-wrap items-center gap-3" data-testid="msp-run-status">
               <StatusPill status={run.status} />
               <span className="font-mono text-xs text-slate-500" data-testid="msp-run-id">{run.pipeline_run_id}</span>
-              <span className="text-sm text-slate-600">Current stage: {run.current_stage || "-"}</span>
+              <span className="text-sm text-slate-600">{MSP_TEXT.detail.currentStage}: {run.current_stage || EMPTY_DISPLAY_VALUE}</span>
             </div>
 
             <div className="grid gap-3 text-sm sm:grid-cols-3">
-              <div className="rounded-md border p-3"><div className="text-xs text-slate-500">Shop</div><div className="font-medium">{run.shop_id}</div></div>
-              <div className="rounded-md border p-3"><div className="text-xs text-slate-500">Created</div><div className="font-medium">{formatDate(run.created_at)}</div></div>
-              <div className="rounded-md border p-3"><div className="text-xs text-slate-500">Updated</div><div className="font-medium">{formatDate(run.updated_at)}</div></div>
+              <div className="rounded-md border p-3"><div className="text-xs text-slate-500">{MSP_TEXT.detail.shop}</div><div className="font-medium">{run.shop_id}</div></div>
+              <div className="rounded-md border p-3"><div className="text-xs text-slate-500">{MSP_TEXT.detail.created}</div><div className="font-medium">{formatDate(run.created_at)}</div></div>
+              <div className="rounded-md border p-3"><div className="text-xs text-slate-500">{MSP_TEXT.detail.updated}</div><div className="font-medium">{formatDate(run.updated_at)}</div></div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3" role="list" aria-label="MSP pipeline stages">
+            <div className="grid gap-3 md:grid-cols-3" role="list" aria-label={MSP_TEXT.detail.stages}>
               {PIPELINE_STAGES.map((stage) => {
                 const currentStatus = stageStatus(stage.key);
                 return (
@@ -756,32 +514,32 @@ function PipelineRunDetail({
 
             {run.status === "succeeded" ? (
               <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex items-center gap-2 font-semibold text-emerald-900"><CheckCircle2 className="h-5 w-5" />Pipeline completed</div>
+                <div className="flex items-center gap-2 font-semibold text-emerald-900"><CheckCircle2 className="h-5 w-5" />{MSP_TEXT.detail.completed}</div>
                 {run.final_result && Object.keys(run.final_result).length > 0 ? <div className="mt-3"><JsonPanel value={run.final_result} /></div> : null}
               </div>
             ) : null}
             {run.status === "failed" ? (
               <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-900">
-                <div className="flex items-center gap-2 font-semibold"><XCircle className="h-5 w-5" />Pipeline failed</div>
+                <div className="flex items-center gap-2 font-semibold"><XCircle className="h-5 w-5" />{MSP_TEXT.detail.failed}</div>
                 {run.error && Object.keys(run.error).length > 0 ? <div className="mt-3"><JsonPanel value={run.error} /></div> : null}
               </div>
             ) : null}
             {run.status === "cancelled" ? (
               <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-slate-700">
-                <div className="flex items-center gap-2 font-semibold"><Ban className="h-5 w-5" />Pipeline cancelled</div>
+                <div className="flex items-center gap-2 font-semibold"><Ban className="h-5 w-5" />{MSP_TEXT.detail.cancelled}</div>
               </div>
             ) : null}
 
             {stageResults?.stages?.length ? (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-semibold"><Activity className="h-4 w-4" />Stage results</div>
+                <div className="flex items-center gap-2 text-sm font-semibold"><Activity className="h-4 w-4" />{MSP_TEXT.detail.stageResults}</div>
                 {stageResults.stages.map((result) => <StageResultCard key={result.stage} result={result} onPreview={onPreviewArtifact} />)}
               </div>
             ) : null}
 
             {artifacts.length > 0 ? (
               <div className="space-y-2">
-                <div className="text-sm font-semibold">Run artifacts</div>
+                <div className="text-sm font-semibold">{MSP_TEXT.detail.runArtifacts}</div>
                 <div className="flex flex-wrap gap-2">
                   {artifacts.map((artifact) => (
                     <Button key={`${artifact.name}-${artifact.path}`} type="button" size="sm" variant="outline" onClick={() => onPreviewArtifact(artifact.name)}>
@@ -794,7 +552,7 @@ function PipelineRunDetail({
             ) : null}
           </>
         ) : (
-          <p className="text-sm text-slate-500">Select a run from history or start a new pipeline.</p>
+          <p className="text-sm text-slate-500">{MSP_TEXT.detail.selectRun}</p>
         )}
       </CardContent>
     </Card>
@@ -804,7 +562,7 @@ function PipelineRunDetail({
 function MspPipelineMain() {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const selectedRunId = searchParams.get("run_id");
+  const selectedRunId = searchParams.get(RUN_QUERY_PARAM);
 
   const [shops, setShops] = useState<Shop[]>([]);
   const [shopsLoading, setShopsLoading] = useState(true);
@@ -817,12 +575,12 @@ function MspPipelineMain() {
     skuMaster: null,
     businessConstraints: null,
   });
-  const [lookbackDays, setLookbackDays] = useState("730");
+  const [lookbackDays, setLookbackDays] = useState(DEFAULT_LOOKBACK_DAYS.toString());
   const [useDateRange, setUseDateRange] = useState(false);
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
   const [forceRefresh, setForceRefresh] = useState(false);
-  const [policy, setPolicy] = useState<PolicyValues>(INITIAL_POLICY);
+  const [policy, setPolicy] = useState<MspPolicyValues>(INITIAL_POLICY);
   const [formError, setFormError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
@@ -850,7 +608,7 @@ function MspPipelineMain() {
       try {
         const allShops = await getShops();
         const shopeeShops = (Array.isArray(allShops) ? allShops : []).filter(
-          (shop) => (shop.marketplace ?? "").toLowerCase() === "shopee",
+          (shop) => (shop.marketplace ?? EMPTY_TEXT).toLowerCase() === SHOPEE_MARKETPLACE,
         );
         if (!mounted) {
           return;
@@ -865,7 +623,7 @@ function MspPipelineMain() {
         }
       } catch (error) {
         if (mounted) {
-          toast({ title: "Failed to load Shopee shops", description: getApiErrorMessage(error, "Unable to load connected shops."), variant: "destructive" });
+          toast({ title: MSP_TEXT.notifications.loadShopsTitle, description: getApiErrorMessage(error, MSP_TEXT.notifications.loadShopsDescription), variant: "destructive" });
         }
       } finally {
         if (mounted) {
@@ -889,7 +647,7 @@ function MspPipelineMain() {
       setRuns(result.items ?? []);
       setHistoryTotalPages(Math.max(result.pagination?.total_pages ?? 1, 1));
     } catch (error) {
-      toast({ title: "Failed to load MSP runs", description: getApiErrorMessage(error, "Unable to load pipeline history."), variant: "destructive" });
+      toast({ title: MSP_TEXT.notifications.loadRunsTitle, description: getApiErrorMessage(error, MSP_TEXT.notifications.loadRunsDescription), variant: "destructive" });
     } finally {
       setHistoryLoading(false);
     }
@@ -917,19 +675,19 @@ function MspPipelineMain() {
       if (stageResult.status === "fulfilled") {
         setStageResults(stageResult.value);
       } else {
-        errors.push(getApiErrorMessage(stageResult.reason, "Stage results are not available yet."));
+        errors.push(getApiErrorMessage(stageResult.reason, MSP_TEXT.notifications.stageResultsUnavailable));
       }
       if (artifactResult.status === "fulfilled") {
         setArtifacts(artifactResult.value.artifacts ?? []);
       } else {
-        errors.push(getApiErrorMessage(artifactResult.reason, "Artifacts are not available yet."));
+        errors.push(getApiErrorMessage(artifactResult.reason, MSP_TEXT.notifications.artifactsUnavailable));
       }
       setPollError(errors.length > 0 ? errors.join(" ") : null);
     } catch (error) {
-      const message = getApiErrorMessage(error, "Unable to retrieve this pipeline run.");
+      const message = getApiErrorMessage(error, MSP_TEXT.notifications.loadRunDescription);
       setPollError(message);
       if (showLoading) {
-        toast({ title: "Failed to load pipeline run", description: message, variant: "destructive" });
+        toast({ title: MSP_TEXT.notifications.loadRunTitle, description: message, variant: "destructive" });
       }
     } finally {
       if (showLoading) {
@@ -976,10 +734,10 @@ function MspPipelineMain() {
     setHistoryPage(1);
   };
 
-  const handleFileChange = (key: UploadFileKey, event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (key: MspUploadFileKey, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
-    if (file && !file.name.toLowerCase().endsWith(".csv")) {
-      setFormError("All MSP input files must use the .csv format.");
+    if (file && !isCsvFile(file)) {
+      setFormError(MSP_TEXT.form.csvOnly);
       event.target.value = "";
       setFiles((current) => ({ ...current, [key]: null }));
       return;
@@ -988,23 +746,23 @@ function MspPipelineMain() {
     setFiles((current) => ({ ...current, [key]: file }));
   };
 
-  const handlePolicyChange = (key: NumericPolicyKey, value: string) => {
+  const handlePolicyChange = (key: MspNumericPolicyKey, value: string) => {
     setPolicy((current) => ({ ...current, [key]: value }));
   };
 
   const handleStart = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (selectedShopId === null) {
-      setFormError("Select a connected Shopee shop first.");
+      setFormError(MSP_TEXT.form.selectShop);
       return;
     }
     if (Object.values(files).some((file) => file === null)) {
-      setFormError("Select all four CSV files before starting the pipeline.");
+      setFormError(MSP_TEXT.form.selectFiles);
       return;
     }
     const configResult = buildPipelineConfig({ lookbackDays, useDateRange, rangeStart, rangeEnd, forceRefresh, policy });
     if (configResult.error || !configResult.config) {
-      setFormError(configResult.error ?? "Invalid pipeline configuration.");
+      setFormError(configResult.error ?? MSP_TEXT.form.invalidConfiguration);
       return;
     }
 
@@ -1022,17 +780,17 @@ function MspPipelineMain() {
         },
         `msp-ui-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`}`,
       );
-      setSearchParams({ run_id: accepted.pipeline_run_id });
+      setSearchParams({ [RUN_QUERY_PARAM]: accepted.pipeline_run_id });
       setHistoryPage(1);
-      toast({ title: "MSP pipeline started", description: `Run ${accepted.pipeline_run_id} was accepted.`, variant: "success" });
+      toast({ title: MSP_TEXT.notifications.pipelineStartedTitle, description: MSP_TEXT.notifications.pipelineAccepted(accepted.pipeline_run_id), variant: "success" });
     } catch (error) {
-      setFormError(getApiErrorMessage(error, "Unable to start the MSP pipeline."));
+      setFormError(getApiErrorMessage(error, MSP_TEXT.notifications.startPipelineError));
     } finally {
       setStarting(false);
     }
   };
 
-  const handleOpenRun = (runID: string) => setSearchParams({ run_id: runID });
+  const handleOpenRun = (runID: string) => setSearchParams({ [RUN_QUERY_PARAM]: runID });
 
   const handleCancelRun = async () => {
     if (!selectedRunId) {
@@ -1043,9 +801,9 @@ function MspPipelineMain() {
       await cancelPipelineRun(selectedRunId);
       setCancelDialogOpen(false);
       await refreshRunDetails(selectedRunId, true);
-      toast({ title: "Pipeline cancellation requested", description: "The controller accepted the cancellation.", variant: "success" });
+      toast({ title: MSP_TEXT.notifications.cancellationRequestedTitle, description: MSP_TEXT.notifications.cancellationAccepted, variant: "success" });
     } catch (error) {
-      toast({ title: "Cancellation failed", description: getApiErrorMessage(error, "Unable to cancel this pipeline run."), variant: "destructive" });
+      toast({ title: MSP_TEXT.notifications.cancellationFailedTitle, description: getApiErrorMessage(error, MSP_TEXT.notifications.cancellationError), variant: "destructive" });
     } finally {
       setCancelling(false);
     }
@@ -1062,7 +820,7 @@ function MspPipelineMain() {
     try {
       setArtifactContent(await getPipelineArtifactContent(selectedRunId, name));
     } catch (error) {
-      toast({ title: "Failed to load artifact", description: getApiErrorMessage(error, "Unable to retrieve artifact content."), variant: "destructive" });
+      toast({ title: MSP_TEXT.notifications.loadArtifactTitle, description: getApiErrorMessage(error, MSP_TEXT.notifications.loadArtifactError), variant: "destructive" });
     } finally {
       setArtifactLoading(false);
     }
@@ -1076,70 +834,70 @@ function MspPipelineMain() {
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
         <div>
-          <div className="flex items-center gap-2 text-sm font-medium text-orange-600"><Activity className="h-4 w-4" />MSP Procurement</div>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">MSP E2E workbench</h1>
+          <div className="flex items-center gap-2 text-sm font-medium text-orange-600"><Activity className="h-4 w-4" />{MSP_TEXT.page.eyebrow}</div>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">{MSP_TEXT.page.title}</h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-600">
-            Upload the approved procurement inputs, let the backend fetch live Shopee stock and sales, and follow the controller through all three stages.
+            {MSP_TEXT.page.description}
           </p>
         </div>
-        {selectedShop ? <div className="rounded-md border bg-white px-3 py-2 text-sm"><div className="text-xs text-slate-500">Selected shop</div><div className="font-semibold">{selectedShop.name || `Shop ${selectedShop.identifier}`}</div></div> : null}
+        {selectedShop ? <div className="rounded-md border bg-white px-3 py-2 text-sm"><div className="text-xs text-slate-500">{MSP_TEXT.page.selectedShop}</div><div className="font-semibold">{formatShopName(selectedShop)}</div></div> : null}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Start a procurement run</CardTitle>
-              <CardDescription>The backend stores the files on the shared pipeline volume and never trusts browser-supplied paths.</CardDescription>
+              <CardTitle>{MSP_TEXT.form.title}</CardTitle>
+              <CardDescription>{MSP_TEXT.form.description}</CardDescription>
             </CardHeader>
             <CardContent>
               {shopsLoading ? <Loading /> : shops.length === 0 ? (
-                <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No connected Shopee shop is available. Connect a shop from Home first.</div>
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{MSP_TEXT.form.noShop}</div>
               ) : (
                 <form className="space-y-6" onSubmit={handleStart}>
                   <div className="space-y-2">
-                    <Label htmlFor="msp-shop">Shop</Label>
-                    <select id="msp-shop" value={selectedShopId ?? ""} onChange={handleShopChange} disabled={starting} className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-950">
-                      {shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name || `Shop ${shop.identifier}`} · {shop.identifier}</option>)}
+                    <Label htmlFor={MSP_ELEMENT_IDS.shop}>{MSP_TEXT.form.shop}</Label>
+                    <select id={MSP_ELEMENT_IDS.shop} value={selectedShopId ?? EMPTY_TEXT} onChange={handleShopChange} disabled={starting} className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-950">
+                      {shops.map((shop) => <option key={shop.id} value={shop.id}>{formatShopOption(shop)}</option>)}
                     </select>
-                    {selectedShop?.token_connected === false ? <p className="text-xs text-amber-700">This shop has no active Shopee token. Reconnect it from Home before starting.</p> : null}
+                    {selectedShop?.token_connected === false ? <p className="text-xs text-amber-700">{MSP_TEXT.form.reconnectNotice}</p> : null}
                   </div>
 
                   <div className="space-y-3">
-                    <div><div className="font-semibold">Required SSOA inputs</div><p className="text-sm text-slate-500">All four files are uploaded in one request; the reviewed mapper is normalized into SSOA order history.</p></div>
+                    <div><div className="font-semibold">{MSP_TEXT.form.requiredInputs}</div><p className="text-sm text-slate-500">{MSP_TEXT.form.requiredInputsDescription}</p></div>
                     <div className="grid gap-4 md:grid-cols-2">
                       {UPLOAD_FIELDS.map((field) => <UploadField key={field.key} field={field} file={files[field.key]} disabled={starting} onChange={(event) => handleFileChange(field.key, event)} />)}
                     </div>
                   </div>
 
                   <div className="space-y-4 rounded-lg border p-4">
-                    <div><div className="font-semibold">Sales history window</div><p className="text-sm text-slate-500">The backend fetches current stock and generates sales history from Shopee.</p></div>
+                    <div><div className="font-semibold">{MSP_TEXT.form.salesWindow}</div><p className="text-sm text-slate-500">{MSP_TEXT.form.salesWindowDescription}</p></div>
                     <div className="grid gap-4 md:grid-cols-3">
-                      <div className="space-y-2"><Label htmlFor="msp-lookback">Lookback days</Label><Input id="msp-lookback" type="number" min="1" max="730" value={lookbackDays} onChange={(event) => setLookbackDays(event.target.value)} disabled={starting || useDateRange} /></div>
-                      <div className="space-y-2"><Label htmlFor="msp-range-start">Range start</Label><Input id="msp-range-start" type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} disabled={starting || !useDateRange} /></div>
-                      <div className="space-y-2"><Label htmlFor="msp-range-end">Range end</Label><Input id="msp-range-end" type="date" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} disabled={starting || !useDateRange} /></div>
+                      <div className="space-y-2"><Label htmlFor={MSP_ELEMENT_IDS.lookback}>{MSP_TEXT.form.lookbackDays}</Label><Input id={MSP_ELEMENT_IDS.lookback} type="number" min={MIN_LOOKBACK_DAYS} max={MAX_LOOKBACK_DAYS} value={lookbackDays} onChange={(event) => setLookbackDays(event.target.value)} disabled={starting || useDateRange} /></div>
+                      <div className="space-y-2"><Label htmlFor={MSP_ELEMENT_IDS.rangeStart}>{MSP_TEXT.form.rangeStart}</Label><Input id={MSP_ELEMENT_IDS.rangeStart} type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} disabled={starting || !useDateRange} /></div>
+                      <div className="space-y-2"><Label htmlFor={MSP_ELEMENT_IDS.rangeEnd}>{MSP_TEXT.form.rangeEnd}</Label><Input id={MSP_ELEMENT_IDS.rangeEnd} type="date" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} disabled={starting || !useDateRange} /></div>
                     </div>
                     <div className="flex flex-wrap items-center gap-6 text-sm">
-                      <label className="flex items-center gap-2"><Switch checked={useDateRange} onCheckedChange={setUseDateRange} disabled={starting} /><span>Use an explicit date range</span></label>
-                      <label className="flex items-center gap-2"><Switch checked={forceRefresh} onCheckedChange={setForceRefresh} disabled={starting} /><span>Force-refresh sales history</span></label>
+                      <label className="flex items-center gap-2"><Switch checked={useDateRange} onCheckedChange={setUseDateRange} disabled={starting} /><span>{MSP_TEXT.form.explicitRange}</span></label>
+                      <label className="flex items-center gap-2"><Switch checked={forceRefresh} onCheckedChange={setForceRefresh} disabled={starting} /><span>{MSP_TEXT.form.forceRefresh}</span></label>
                     </div>
                   </div>
 
                   <div className="space-y-4 rounded-lg border p-4">
-                    <div><div className="font-semibold">Advanced controller policy</div><p className="text-sm text-slate-500">Blank numeric values use MSP defaults. Values are validated before upload.</p></div>
+                    <div><div className="font-semibold">{MSP_TEXT.form.policy}</div><p className="text-sm text-slate-500">{MSP_TEXT.form.policyDescription}</p></div>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {NUMERIC_POLICY_FIELDS.map((field) => <div key={field.key} className="space-y-2"><Label htmlFor={`msp-policy-${field.key}`}>{field.label}</Label><Input id={`msp-policy-${field.key}`} type="number" step="any" min={field.rule === "positive" || field.rule === "integer" ? "1" : "0"} placeholder={field.placeholder} value={policy[field.key]} onChange={(event) => handlePolicyChange(field.key, event.target.value)} disabled={starting} /></div>)}
-                      <div className="space-y-2"><Label htmlFor="msp-policy-method">MILP selection method</Label><select id="msp-policy-method" value={policy.milp_selection_method} onChange={(event) => setPolicy((current) => ({ ...current, milp_selection_method: event.target.value }))} disabled={starting} className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"><option value="MOST_FREQUENT">Most-Frequent</option><option value="shannon_entropy_classic">Entropy-TOPSIS</option><option value="linear_bwm_linprog_solver">BWM-TOPSIS</option></select><p className="text-xs text-slate-500">Choose the weighting method used by SSOA.</p></div>
-                      <div className="space-y-2"><Label htmlFor="msp-policy-constraints">Supplier price constraints</Label><select id="msp-policy-constraints" value={policy.enforce_supplier_order_price_constraints} onChange={(event) => setPolicy((current) => ({ ...current, enforce_supplier_order_price_constraints: event.target.value as PolicyValues["enforce_supplier_order_price_constraints"] }))} disabled={starting} className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"><option value="default">Controller default</option><option value="true">Enabled</option><option value="false">Disabled</option></select></div>
+                      {NUMERIC_POLICY_FIELDS.map((field) => <div key={field.key} className="space-y-2"><Label htmlFor={`${MSP_ELEMENT_ID_PREFIXES.policy}-${field.key}`}>{field.label}</Label><Input id={`${MSP_ELEMENT_ID_PREFIXES.policy}-${field.key}`} type="number" step={NUMBER_INPUT_STEP} min={field.rule === "positive" || field.rule === "integer" ? MIN_LOOKBACK_DAYS : MIN_NONNEGATIVE_VALUE} placeholder={field.placeholder} value={policy[field.key]} onChange={(event) => handlePolicyChange(field.key, event.target.value)} disabled={starting} /></div>)}
+                      <div className="space-y-2"><Label htmlFor={MSP_ELEMENT_IDS.policyMethod}>{MSP_TEXT.form.method}</Label><select id={MSP_ELEMENT_IDS.policyMethod} value={policy.milp_selection_method} onChange={(event) => setPolicy((current) => ({ ...current, milp_selection_method: event.target.value }))} disabled={starting} className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">{MILP_SELECTION_METHOD_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><p className="text-xs text-slate-500">{MSP_TEXT.form.methodDescription}</p></div>
+                      <div className="space-y-2"><Label htmlFor={MSP_ELEMENT_IDS.policyConstraints}>{MSP_TEXT.form.supplierConstraints}</Label><select id={MSP_ELEMENT_IDS.policyConstraints} value={policy.enforce_supplier_order_price_constraints} onChange={(event) => setPolicy((current) => ({ ...current, enforce_supplier_order_price_constraints: event.target.value as MspPolicyValues["enforce_supplier_order_price_constraints"] }))} disabled={starting} className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">{SUPPLIER_CONSTRAINT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
                     </div>
                   </div>
 
                   {formError ? <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{formError}</div> : null}
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs text-slate-500">No files or controller credentials are sent anywhere except the authenticated RIMU backend.</p>
+                    <p className="text-xs text-slate-500">{MSP_TEXT.form.privacyNotice}</p>
                     <Button type="submit" disabled={starting || selectedShopId === null || shops.length === 0}>
                       {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                      {starting ? "Starting pipeline..." : "Start MSP run"}
+                      {starting ? MSP_TEXT.form.starting : MSP_TEXT.form.start}
                     </Button>
                   </div>
                 </form>
@@ -1172,18 +930,18 @@ function MspPipelineMain() {
 
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Cancel this pipeline?</DialogTitle><DialogDescription>The controller will stop the current run. Completed stages remain available for inspection.</DialogDescription></DialogHeader>
-          <DialogFooter><Button type="button" variant="outline" onClick={() => setCancelDialogOpen(false)}>Keep running</Button><Button type="button" variant="destructive" disabled={cancelling} onClick={() => { void handleCancelRun(); }}>{cancelling ? "Cancelling..." : "Cancel pipeline"}</Button></DialogFooter>
+          <DialogHeader><DialogTitle>{MSP_TEXT.dialogs.cancelTitle}</DialogTitle><DialogDescription>{MSP_TEXT.dialogs.cancelDescription}</DialogDescription></DialogHeader>
+          <DialogFooter><Button type="button" variant="outline" onClick={() => setCancelDialogOpen(false)}>{MSP_TEXT.dialogs.keepRunning}</Button><Button type="button" variant="destructive" disabled={cancelling} onClick={() => { void handleCancelRun(); }}>{cancelling ? MSP_TEXT.dialogs.cancelling : MSP_TEXT.dialogs.cancelPipeline}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={artifactDialogOpen} onOpenChange={setArtifactDialogOpen}>
         <DialogContent className="max-w-5xl">
-          <DialogHeader><DialogTitle>Artifact: {artifactName || "-"}</DialogTitle><DialogDescription>Artifact content returned through the authenticated backend.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{MSP_TEXT.dialogs.artifactPrefix}: {artifactName || EMPTY_DISPLAY_VALUE}</DialogTitle><DialogDescription>{MSP_TEXT.dialogs.artifactDescription}</DialogDescription></DialogHeader>
           {artifactLoading ? <Loading /> : artifactContent?.content_type === "csv" ? (
-            <div className="space-y-2"><div className="text-xs text-slate-500">Showing up to {MAX_ARTIFACT_PREVIEW_ROWS} rows.</div><div className="max-h-[60vh] overflow-auto rounded-md border"><Table><TableHeader><TableRow>{artifactColumns.map((column) => <TableHead key={column}>{column}</TableHead>)}</TableRow></TableHeader><TableBody>{(artifactContent.rows ?? []).slice(0, MAX_ARTIFACT_PREVIEW_ROWS).map((row, rowIndex) => <TableRow key={rowIndex}>{artifactColumns.map((column) => <TableCell key={column}>{row[column] ?? ""}</TableCell>)}</TableRow>)}</TableBody></Table></div></div>
-          ) : artifactContent ? <JsonPanel value={artifactContent.raw ?? artifactContent} /> : <p className="text-sm text-slate-500">No artifact content available.</p>}
-          <DialogFooter><Button type="button" variant="outline" onClick={() => setArtifactDialogOpen(false)}><SquareArrowOutUpRight className="h-4 w-4" />Close</Button></DialogFooter>
+            <div className="space-y-2"><div className="text-xs text-slate-500">{MSP_TEXT.dialogs.previewRows} {MAX_ARTIFACT_PREVIEW_ROWS} {MSP_TEXT.dialogs.previewRowsSuffix}</div><div className="max-h-[60vh] overflow-auto rounded-md border"><Table><TableHeader><TableRow>{artifactColumns.map((column) => <TableHead key={column}>{column}</TableHead>)}</TableRow></TableHeader><TableBody>{(artifactContent.rows ?? []).slice(0, MAX_ARTIFACT_PREVIEW_ROWS).map((row, rowIndex) => <TableRow key={rowIndex}>{artifactColumns.map((column) => <TableCell key={column}>{row[column] ?? EMPTY_TEXT}</TableCell>)}</TableRow>)}</TableBody></Table></div></div>
+          ) : artifactContent ? <JsonPanel value={artifactContent.raw ?? artifactContent} /> : <p className="text-sm text-slate-500">{MSP_TEXT.detail.noArtifactContent}</p>}
+          <DialogFooter><Button type="button" variant="outline" onClick={() => setArtifactDialogOpen(false)}><SquareArrowOutUpRight className="h-4 w-4" />{MSP_TEXT.dialogs.close}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
