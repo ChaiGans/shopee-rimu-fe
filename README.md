@@ -34,7 +34,9 @@ mapping, supplier profile, SKU master, and business constraint CSVs. The
 frontend sends them to `rimu-be-go` through one multipart upload-and-start
 request. The backend owns shared-volume paths, Shopee stock and sales
 preparation, and controller communication; the browser never calls the MSP
-controller directly or receives service credentials.
+controller directly or receives service credentials. Each input also offers a
+header-only CSV template generated from the schemas expected by the backend and
+the SSOA stages.
 
 ```mermaid
 graph LR

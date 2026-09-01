@@ -10,6 +10,7 @@ import {
   EMPTY_TEXT,
   MAX_LOOKBACK_DAYS,
   MIN_LOOKBACK_DAYS,
+  type MspCsvTemplate,
   MSP_TEXT,
   NUMERIC_POLICY_FIELDS,
   SHOP_FALLBACK_PREFIX,
@@ -206,3 +207,26 @@ export const formatShopOption = (shop: Pick<Shop, "name" | "identifier">): strin
 
 export const isCsvFile = (file: File): boolean =>
   file.name.toLowerCase().endsWith(CSV_FILE_EXTENSION);
+
+const escapeCsvValue = (value: string): string => {
+  if (!/[",\r\n]/.test(value)) {
+    return value;
+  }
+  return `"${value.replace(/"/g, '""')}"`;
+};
+
+export const serializeCsvTemplate = (template: MspCsvTemplate): string =>
+  `${template.headers.map(escapeCsvValue).join(",")}\r\n`;
+
+export const downloadCsvTemplate = (template: MspCsvTemplate): void => {
+  const blob = new Blob([serializeCsvTemplate(template)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = template.fileName;
+  link.hidden = true;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+};
