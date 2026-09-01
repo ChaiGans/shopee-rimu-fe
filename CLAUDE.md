@@ -16,6 +16,8 @@
   outward. Continue lifting it toward `src/` until the narrowest shared owner
   is reached; never duplicate the value or helper.
 - Reuse an existing outer constant/helper before creating a new local copy.
+- Use the existing shadcn/ui primitives for shared UI patterns. For status tags,
+  use `Badge`; do not recreate a pill with a custom `<span>`.
 
 ## Boundaries
 

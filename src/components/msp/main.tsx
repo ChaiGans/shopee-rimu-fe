@@ -15,6 +15,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 
 import Loading from "@/components/loading";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -106,11 +107,12 @@ import {
 
 type UploadFileState = Record<MspUploadFileKey, File | null>;
 
-function StatusPill({ status }: { status: NormalizedStageStatus | PipelineRunStatus }) {
+function StatusBadge({ status }: { status: NormalizedStageStatus | PipelineRunStatus }) {
   const normalized = normalizeStageStatus(status);
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${statusClassName(normalized)}`}
+    <Badge
+      variant="outline"
+      className={`gap-1 py-1 ${statusClassName(normalized)}`}
       data-status={normalized}
     >
       {normalized === "running" || normalized === "queued" ? (
@@ -125,7 +127,7 @@ function StatusPill({ status }: { status: NormalizedStageStatus | PipelineRunSta
         <Circle className="h-3.5 w-3.5" />
       )}
       {statusLabel(normalized)}
-    </span>
+    </Badge>
   );
 }
 
@@ -208,7 +210,7 @@ function StageResultCard({
           <CardTitle className="text-lg">{result.label || result.stage}</CardTitle>
           <CardDescription>{result.summary || MSP_TEXT.detail.noStageSummary}</CardDescription>
         </div>
-        <StatusPill status={result.status} />
+        <StatusBadge status={result.status} />
       </CardHeader>
       <CardContent className="space-y-4">
         {result.metrics?.length > 0 ? (
@@ -377,7 +379,7 @@ function PipelineRunHistory({
                   {runs.map((run) => (
                     <TableRow key={run.pipeline_run_id}>
                       <TableCell className="max-w-36 truncate font-mono text-xs">{run.pipeline_run_id}</TableCell>
-                      <TableCell><StatusPill status={run.status} /></TableCell>
+                          <TableCell><StatusBadge status={run.status} /></TableCell>
                       <TableCell className="whitespace-nowrap text-xs">{run.current_stage}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs">{formatDate(run.updated_at)}</TableCell>
                       <TableCell className="text-right">
@@ -486,7 +488,7 @@ function PipelineRunDetail({
         {run ? (
           <>
             <div className="flex flex-wrap items-center gap-3" data-testid="msp-run-status">
-              <StatusPill status={run.status} />
+              <StatusBadge status={run.status} />
               <span className="font-mono text-xs text-slate-500" data-testid="msp-run-id">{run.pipeline_run_id}</span>
               <span className="text-sm text-slate-600">{MSP_TEXT.detail.currentStage}: {run.current_stage || EMPTY_DISPLAY_VALUE}</span>
             </div>
@@ -504,7 +506,7 @@ function PipelineRunDetail({
                   <div key={stage.key} role="listitem" data-testid={`msp-stage-${stage.key}`} className="rounded-lg border p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="font-medium">{stage.label}</div>
-                      <StatusPill status={currentStatus} />
+                      <StatusBadge status={currentStatus} />
                     </div>
                     <p className="mt-2 text-xs text-slate-500">{stage.description}</p>
                   </div>
