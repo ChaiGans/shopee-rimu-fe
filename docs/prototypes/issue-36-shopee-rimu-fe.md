@@ -1,4 +1,4 @@
-# Throwaway prototype storyboard: account-canonical procurement
+# Throwaway prototype storyboard: User-scoped canonical procurement
 
 Status: review-only, offline, and non-mutating. This is the local storyboard
 linked by the UI design review; it is not production UI and does not call
@@ -9,8 +9,8 @@ linked by the UI design review; it is not production UI and does not call
 The eventual static prototype should expose the same fixture through these
 review variants:
 
-- `?variant=catalog`: account header, parent/variant tree, detail drawer, and
-  inherited packaging.
+- `?variant=catalog`: authenticated User context, parent/variant tree, detail
+  drawer, and inherited packaging.
 - `?variant=pull-degraded`: successful main shop, failed outlet shop, retained
   prior observations, and reconciliation tabs.
 - `?variant=history-invalid`: exact nine-column preview with row/field errors,
@@ -23,7 +23,7 @@ review variants:
 ## Shared fixture
 
 ```yaml
-account: Rimu Bags (acct-bags)
+user: Rimu Bags (user-bags)
 shops:
   - shop-main: successful PULL
   - shop-outlet: failed PULL; previous observations retained
@@ -45,20 +45,22 @@ warnings:
 ## Interaction storyboard
 
 1. **Catalog** - expand `BAG-001`, select `BAG-001-BLK-M`, and open the detail
-   drawer. The drawer keeps canonical identity and account inventory above
-   marketplace observations. Clicking `PULL` opens the scope/progress state.
+   drawer. The drawer keeps canonical identity and User inventory above
+   marketplace observations. Clicking `PULL` opens the labelled Shop
+   scope/progress state; the Shop is a source filter, not an owner selector.
 2. **Degraded PULL** - show `shop-main` as succeeded and `shop-outlet` as
    failed. Selecting `Failed shops` explains that the outlet's prior
    observation remains. The canonical table does not change.
 3. **Adoption** - select an unmapped observation. `Attach to existing` opens a
-   parent/variant chooser. `Adopt as new` opens a preview where the owner must
-   complete packaging and on-hand before the in-memory confirm button enables.
+   parent/variant chooser. `Adopt as new` opens a preview where the
+   authenticated User must complete packaging and on-hand before the in-memory
+   confirm button enables.
 4. **History** - switch to the exact preview. Invalid rows keep the active v17
    badge and the replacement button disabled. A valid variant shows the
    replacement confirmation with old/new versions.
-5. **Preflight** - show blockers separately from warnings. The owner must check
-   the UNKNOWN/not_allocated acknowledgement; degraded PULL does not add a
-   second acknowledgement.
+5. **Preflight** - show blockers separately from warnings. The authenticated
+   User must check the UNKNOWN/not_allocated acknowledgement; degraded PULL
+   does not add a second acknowledgement.
 6. **Result** - show allocated and UNKNOWN rows. Open the supplier-SKU
    deactivation dialog; after confirm, the same snapshot row gets
    `Inactive for future runs` while its quantity and supplier values remain
@@ -66,7 +68,8 @@ warnings:
 
 ## Review questions
 
-- Is it obvious that account data is canonical and PULL data is observational?
+- Is it obvious that User-owned data is canonical and PULL data is
+  observational, while Shop selection only filters marketplace context?
 - Is the parent/variant tree understandable without knowing Shopee item/model
   terminology?
 - Do warnings distinguish blockers, assumptions, degraded shops, and

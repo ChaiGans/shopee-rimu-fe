@@ -73,7 +73,7 @@ decision.
    adoption/attachment of unmapped observations.
 3. Shared packaging, on-hand inventory, selling-price visibility, and readiness
    rules.
-4. Account suppliers, supplier aliases, supplier-SKU constraints, and manual
+4. User-owned suppliers, supplier aliases, supplier-SKU constraints, and manual
    supplier or supplier-SKU deactivation/reactivation.
 5. Exact nine-column order-history import, full validation preview, atomic
    replacement confirmation, and active-snapshot deletion.
@@ -107,7 +107,7 @@ owner.
 
 | Step | User action | Visible state/result | API/data dependency |
 | --- | --- | --- | --- |
-| 1 | Open `/msp` while authenticated. | User context header shows the signed-in User, connected-shop count, active history version, and last PULL. There is no User/account selector; if no connected shop exists, show a specific connection empty state. | Authenticated session/cookie supplies `user_id`; proposed `GET /api/user/context` and existing `GET /api/shop/` return the User's shops. |
+| 1 | Open `/msp` while authenticated. | User context header shows the signed-in User, connected-shop count, active history version, and last PULL. There is no owner selector; if no connected shop exists, show a specific connection empty state. | Authenticated session/cookie supplies `user_id`; proposed `GET /api/user/context` and existing `GET /api/shop/` return the User's shops. |
 | 2 | Choose `Use saved app state` or `PULL first`; when needed, choose `All connected shops` or one Shop in the marketplace scope control. | The choice explains that PULL is read-only observation. `PULL first` lists the selected/all connected Shopee shops and last observation time before starting. | `GET /api/shop/`; `POST .../marketplace-pulls` (proposed), with optional `shop_id`/`shop_ids` scope validated against the authenticated User. |
 | 3 | Review PULL progress and reconciliation. | Per-shop progress is visible. Successful shops commit observations atomically; failed shops retain their previous observations and are marked `Degraded`. Tabs show Matched, Unmapped, SKU drift, stock/price discrepancies, and failed shops. | Pull status/report stream or polling; no canonical product, inventory, packaging, supplier, or price mutation. |
 | 4 | Attach a new external identity to an existing canonical product/variant, or select `Adopt as new`. | Stable external association is preferred; exact external SKU is a fallback only. No fuzzy suggestion is shown. Attach preserves the existing canonical SKU. Adoption previews the parent/variant tree, proposed canonical SKUs, packaging, and on-hand fields. | `POST .../catalog/associations/attach` or `POST .../catalog/adoptions/preview` and confirmed adoption (proposed). |
@@ -369,7 +369,7 @@ For the fixture, `BAG-001-BLK-M` contributes 10 open on-order units from the
 first row; the explicit zero is closed zero-fill; `BAG-002-L` demonstrates
 over-receipt while keeping a capped fill-rate metric; `HISTORY-ONLY` is shown
 as a diagnostic; and the last row blocks activation because its price is zero.
-The test account may use a separate invalid chronology row to assert the
+The test User may use a separate invalid chronology row to assert the
 reported exclusion path.
 
 After a valid preview, the confirmation dialog says:
@@ -617,38 +617,41 @@ secondary but remain adjacent to the value they qualify.
 ### Boundary and compatibility
 
 The frontend uses the existing Axios client (`withCredentials: true`) and calls
-only authenticated `rimu-be-go` endpoints. `rimu-be-go` owns account/shop
+only authenticated `rimu-be-go` endpoints. `rimu-be-go` owns User/Shop
 authorization, Shopee access tokens, PULL adapters, import persistence, and the
-facade to the internal MSP controller. The browser never receives controller
-credentials, shared-volume paths, or direct Shopee/MSP URLs.
+facade to the internal MSP controller. The authenticated session establishes
+`user_id`; the browser never chooses or sends a different owner scope. The
+browser never receives controller credentials, shared-volume paths, or direct
+Shopee/MSP URLs.
 
 Current repository seams that implementation must preserve or intentionally
 migrate:
 
 | Existing seam | Current behavior | Design migration |
 | --- | --- | --- |
-| `GET /api/shop/` | Loads connected shops for Home, Products, and current MSP shop selector. | Add account-scoped shop summary while retaining ownership filtering; no shop becomes catalog owner. |
-| `GET /api/marketplace/product/:shopId/list` | Returns shop-local parent/model product snapshots and marketplace stock/price. | Use as a compatibility/read-only observation source until account PULL endpoints are available; do not write canonical inventory from it. |
-| `POST /api/msp/pipeline-runs/upload-start` | Uploads four run-scoped CSV files and starts a shop run. | Replace normal path with account snapshot/preflight/run API; retain a compatibility adapter only during migration. |
-| `GET /api/msp/pipeline-runs/:id`, `/stage-results`, `/artifacts`, `/artifacts/:name/content`, `/cancel` | Polls current run/stage/artifact state. | Preserve status/artifact semantics and expose account snapshot IDs/evidence in the new facade. |
+| `GET /api/shop/` | Loads connected Shops for Home, Products, and the current MSP marketplace Shop selector. | Retain authenticated User ownership filtering and expose source/freshness metadata; no Shop becomes catalog owner. |
+| `GET /api/marketplace/product/:shopId/list` | Returns shop-local parent/model product snapshots and marketplace stock/price. | Use as a compatibility/read-only observation source until User-scoped PULL endpoints are available; do not write canonical inventory from it. |
+| `POST /api/msp/pipeline-runs/upload-start` | Uploads four run-scoped CSV files and starts a shop-bound run. | Replace the normal path with User-scoped snapshot/preflight/run APIs plus optional marketplace Shop scope; retain a compatibility adapter only during migration. |
+| `GET /api/msp/pipeline-runs/:id`, `/stage-results`, `/artifacts`, `/artifacts/:name/content`, `/cancel` | Polls current run/stage/artifact state. | Preserve status/artifact semantics and expose User snapshot IDs/evidence in the new facade. |
 | `POST /api/marketplace/product/hpp/upload-preview` and `upload-apply` | HPP-only preview/apply for products. | Do not conflate HPP with canonical packaging/inventory; map or retire only after an approved compatibility plan. |
 
-### Proposed account-facing endpoints
+### Proposed User-facing endpoints
 
 Names below are FE assumptions for contract discussion, not implementation
 claims. Exact paths and payloads must be finalized with the backend owner before
-production code. Every endpoint is served by `rimu-be-go`.
+production code. Every endpoint is served by `rimu-be-go`; `user_id` is inferred
+from the authenticated session and is never a client-selectable path segment.
 
 | Operation | Proposed endpoint | Required response/state |
 | --- | --- | --- |
-| Load current account and shops | `GET /api/accounts/current` | `account_id`, name/context, connected Shopee shops, account versions, readiness summary. |
-| List canonical catalog | `GET /api/accounts/:account_id/catalog?cursor=...` | Parent/variant tree, canonical IDs/SKUs, packaging readiness, on-hand, derived on-order summary, association counts. |
-| Product detail | `GET /api/accounts/:account_id/catalog/:product_id` | Canonical data, complete associations, PULL observations, source timestamps, supplier candidate summaries. |
-| Start/status PULL | `POST /api/accounts/:account_id/marketplace-pulls`, `GET .../marketplace-pulls/:pull_id` | Pull scope, per-shop state, committed observation versions, matched/unmapped/drift/discrepancy counts, failed-shop errors. |
-| Reconciliation rows | `GET .../marketplace-pulls/:pull_id/reconciliation` | Stable association/exact-SKU match reason, unmapped observation, drift/discrepancy data, adoption/attach eligibility. |
+| Load authenticated User context and Shops | `GET /api/user/context` (proposed) plus `GET /api/shop/` compatibility | `user_id` from session, display context, connected Shopee Shops, User versions, readiness summary. No owner selector. |
+| List canonical catalog | `GET /api/catalog?cursor=...` | User-scoped parent/variant tree, canonical IDs/SKUs, packaging readiness, on-hand, derived on-order summary, association counts. |
+| Product detail | `GET /api/catalog/:product_id` | User-owned canonical data, complete Shop associations, PULL observations, source timestamps, supplier candidate summaries. |
+| Start/status PULL | `POST /api/marketplace-pulls`, `GET /api/marketplace-pulls/:pull_id` | Optional `shop_id`/`shop_ids` observation scope, per-Shop state, committed observation versions, matched/unmapped/drift/discrepancy counts, failed-Shop errors. |
+| Reconciliation rows | `GET /api/marketplace-pulls/:pull_id/reconciliation?shop_id=...` | Stable association/exact-SKU match reason, unmapped observation, Shop/source data, drift/discrepancy data, adoption/attach eligibility. |
 | Preview/confirm adoption or attach | `POST .../catalog/adoptions/preview`, `POST .../catalog/adoptions`, `POST .../catalog/associations/attach` | Preview token, row outcomes (`added`, `already_exists`, `failed`), canonical IDs, idempotency result; no partial overwrite on conflict. |
-| Edit packaging/inventory | `PATCH .../catalog/:product_id/packaging`, `PUT .../inventory/:canonical_sku` | Confirmed saved version and resolved packaging; `409` stale version; validation errors by field. |
-| Suppliers/relationships | `GET .../suppliers`, `GET .../supplier-sku`, `PATCH .../suppliers/:id`, `PATCH .../supplier-sku/:id/availability` | Active/inactive state, reason, constraints, aliases, imputation metadata, future-only effect. |
+| Edit packaging/inventory | `PATCH /api/catalog/:product_id/packaging`, `PUT /api/inventory/:canonical_sku` | Confirmed User-owned saved version and resolved packaging; `409` stale version; validation errors by field. |
+| Suppliers/relationships | `GET /api/suppliers`, `GET /api/supplier-sku`, `PATCH /api/suppliers/:id`, `PATCH /api/supplier-sku/:id/availability` | User-owned active/inactive state, reason, constraints, aliases, imputation metadata, future-only effect. |
 | History preview/activation/deletion | `POST .../order-history/import/preview`, `POST .../order-history/import/activate`, `DELETE .../order-history/active` | Exact schema result, all row/field errors, preview token, expected/current version, immutable activation, audit tombstone. |
 | MSP preflight | `POST .../msp/preflight` | Blockers, warnings, assumptions, unknown/unassigned list, history-only diagnostics, PULL health, resolved snapshot references. |
 | MSP run lifecycle | `POST .../msp/runs`, `GET .../msp/runs`, `GET .../msp/runs/:run_id`, `POST .../msp/runs/:run_id/cancel` | `202` accepted with idempotency key, status/current stage, immutable configuration/evidence snapshot IDs, cancellation result. |
@@ -656,42 +659,44 @@ production code. Every endpoint is served by `rimu-be-go`.
 
 ### Stable identifiers and state semantics
 
-- `account_id`, internal `product_id`/`variant_id`, canonical SKU,
+- `user_id` from the authenticated session, internal `product_id`/`variant_id`, canonical SKU,
   `association_id`, `shop_id`, `pull_id`, `history_snapshot_id/version`,
   `preflight_id`, `run_id`, `configuration_snapshot_id`, and
   `supplier_sku_relationship_id` are stable identifiers. Marketplace item/model
   IDs are external only.
-- Canonical SKU is unique within an account and immutable after creation. PULL
+- Canonical SKU is unique within a User and immutable after creation. PULL
   observations and external SKU text may change without changing canonical
   identity.
 - Preview endpoints are non-mutating. Adoption, association, activation,
   inventory/packaging saves, deactivation, and run creation return confirmed
   state and accept an idempotency key where a retry could duplicate work.
-- Do not use optimistic updates for account snapshots, adoption, history
+- Do not use optimistic updates for User snapshots, adoption, history
   activation, or supplier availability. Show a pending state and replace local
   data with the confirmed response. A simple draft input may be optimistic only
   inside the form; the saved badge waits for confirmation.
 - History activation is all-or-nothing and uses an expected active version.
   Failed validation or stale version leaves the previous active snapshot intact.
-- PULL commits per shop only after complete success. A degraded account pull is
-  a valid report; it does not mutate canonical account state or block a run from
+- PULL commits per Shop only after complete success. A degraded User pull is a
+  valid report; it does not mutate canonical User state or block a run from
   saved state.
-- MSP run creation captures account catalog, packaging, inventory, suppliers,
+- MSP run creation captures the User catalog, packaging, inventory, suppliers,
   constraints, PULL observations, history version, assumptions, defaults, and
-  policy into an immutable snapshot. Result rendering must use that snapshot,
-  not live configuration tables.
+  policy into an immutable snapshot. An optional Shop scope identifies the
+  marketplace source only. Result rendering must use that snapshot, not live
+  configuration tables.
 - Expected error body shape: `{ code, message, field_errors?, row_errors?,
   retryable?, request_id? }`. The FE maps `401`, `403`, `409`, `422`, `429`, and
   `5xx` to the state matrix above and never exposes raw internal paths.
 
 ### Open API decisions before implementation
 
-1. Exact account selection response and whether one account is returned by
-   `current` or a list is required.
+1. Exact authenticated User context response and Shop summary shape must be
+   agreed; there is no owner-selection response or Account entity.
 2. Canonical product/import payload and row-level adoption outcome shape must be
    stable before selectors and fixtures are written.
-3. Account-level MSP API must replace the current `shop_id`-only run payload
-   while preserving existing run history links during migration.
+3. User-level MSP API must replace the current `shop_id`-only run payload while
+   preserving existing run history links during migration; any `shop_id` is
+   optional marketplace source/scope metadata, never ownership.
 4. Result/cart artifact names and unassigned-row fields must be agreed with
    `rimu-msp` so the FE does not infer actionability from a missing supplier.
 5. Exact versioned supplier metric defaults and forwarder transit settings must
@@ -702,22 +707,22 @@ production code. Every endpoint is served by `rimu-be-go`.
 ### Test file, command, and fixture reset
 
 The implementation PR should add or extend
-`e2e/account-canonical-procurement-flow.mjs` and keep selectors semantic
+`e2e/user-scoped-procurement-flow.mjs` and keep selectors semantic
 (`getByRole`, `getByLabel`, and stable `data-testid` only for run IDs, status,
 and row outcomes). Existing `e2e/msp-workbench-flow.mjs` remains the legacy
-compatibility flow until the account-level path is the default.
+compatibility flow until the User-scoped path is the default.
 
 Record the full-stack flow from the workspace root with the existing harness:
 
 ```powershell
 node workspace-harness/scripts/record-ui-proof.mjs `
   --url $env:RIMU_STAGING_FRONTEND_URL `
-  --flow .\shopee-rimu-fe\e2e\account-canonical-procurement-flow.mjs `
-  --output .\workspace-harness\artifacts\issue-36-account-procurement.webm
+  --flow .\shopee-rimu-fe\e2e\user-scoped-procurement-flow.mjs `
+  --output .\workspace-harness\artifacts\issue-36-user-procurement.webm
 ```
 
-The staging account must be isolated and sanitized. Reset by backend-owned
-fixture seed/restore before each flow (account catalog, shops, supplier state,
+The staging User must be isolated and sanitized. Reset by backend-owned
+fixture seed/restore before each flow (User catalog, Shops, supplier state,
 history version, PULL observations, and run state); the browser must not call
 internal services or rely on previous flow ordering. For API-level failure
 branches, the staging harness may inject deterministic `rimu-be-go` responses
@@ -730,7 +735,7 @@ does not contain those runtime artifacts.
 
 | Flow ID | Starting fixture/state | User actions | Expected visible result/assertions | Artifact |
 | --- | --- | --- | --- | --- |
-| UI-001 | Authenticated account `acct-bags`; no canonical products; two connected Shopee shops. | Open MSP and inspect Overview, then choose PULL. | Account selector is labelled; empty catalog says PULL does not create products; PULL scope lists both shops; Start MSP is blocked until catalog/history readiness. | Video + Overview/empty screenshots + trace. |
+| UI-001 | Authenticated User `user-bags`; no canonical products; two connected Shopee Shops. | Open MSP and inspect Overview, then choose PULL. | Signed-in User context is visible but not selectable; marketplace Shop selector is labelled and defaults to all connected Shops; empty catalog says PULL does not create products; Start MSP is blocked until catalog/history readiness. | Video + Overview/empty screenshots + trace. |
 | UI-002 | Catalog with existing associations; `shop-main` PULL succeeds and `shop-outlet` fails while a prior outlet observation exists. | Run PULL first and open Failed shops/Discrepancies. | Main observations commit; outlet prior observation remains; `Degraded` and failed-shop count are visible; canonical SKU/on-hand/packaging are unchanged; preflight allows saved-state continuation without a second degraded acknowledgement. | Video + degraded/reconciliation screenshots + trace. |
 | UI-003 | One unmapped parent with two variants, one existing parent association, one duplicate canonical SKU conflict. | Open Unmapped; attach one variant to existing parent; preview/adopt the new tree; retry the duplicate. | Attach reuses parent; adoption requires complete packaging/on-hand; duplicate reports `already_exists` or conflict without duplicate rows; PULL never auto-adopts. | Video + adoption/row-outcome screenshots + trace. |
 | UI-004 | Parent packaging complete, variant has no override; second variant has partial override; on-hand includes explicit zero. | Edit parent, view inheritance, attempt partial override, save valid override and zero stock. | Partial override is blocked; inherited badge appears; valid override shows derived volume; zero remains `0`; marketplace stock discrepancy is warning-only and does not change on-hand. | Video + packaging/error screenshots + trace. |
@@ -745,15 +750,15 @@ The highest-risk atomicity assertions are UI-002 (failed PULL preserves prior
 shop observations), UI-006 (invalid history never replaces v17), UI-005
 (future-only deactivation cannot rewrite a result), and UI-009 (result survives
 later settings changes and reload). The implementation PR should include
-request/run IDs in test logs without exposing account secrets or raw paths.
+request/run IDs in test logs without exposing User secrets or raw paths.
 
 ## Sanitized fixture contract
 
 The browser flows should share these deterministic fixture concepts:
 
 ```yaml
-account:
-  id: acct-bags
+user:
+  id: user-bags
   name: Rimu Bags
 shops:
   - id: shop-main
@@ -790,10 +795,10 @@ pass by live-looking up current settings.
 
 ## Review decisions required
 
-- Confirm that `/msp` remains the compatibility route and that the account-level
+- Confirm that `/msp` remains the compatibility route and that the User-level
   tabs are the first release IA.
-- Confirm the account selector response and proposed account API path names
-  before implementation begins.
+- Confirm the authenticated User context response and proposed User API path
+  names before implementation begins; there is no Account selector/entity.
 - Confirm the adoption form's proposed canonical SKU seed/edit behavior and the
   requirement for complete packaging and on-hand before creation.
 - Confirm that degraded PULL is non-blocking with no second acknowledgement,
@@ -805,7 +810,7 @@ pass by live-looking up current settings.
 - Confirm result/cart snapshot fields and the `UNKNOWN`/
   `not_allocated` rendering contract with `rimu-msp`.
 - Review the [throwaway prototype storyboard](../prototypes/issue-36-shopee-rimu-fe.md)
-  and decide whether the account-vs-shop hierarchy and warnings are scannable.
+  and decide whether the User-vs-Shop hierarchy and warnings are scannable.
 
 Do not implement production UI until the owner replies with `DESIGN APPROVED`
 or equivalent. Any behavior change must revise the user flow, wireframe,
