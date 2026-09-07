@@ -1,10 +1,10 @@
-# UI design review: Account-canonical procurement and marketplace PULL
+# UI design review: User-scoped canonical procurement and marketplace PULL
 
 ```yaml
 schema_version: 1
 design_id: ticket-36-ui-design
-source_issue: https://github.com/ChaiGans/shopee-rimu-fe/issues/12
-child_issue: shopee-rimu-fe#12
+source_issue: https://github.com/ChaiGans/shopee-rimu-fe/issues/13
+child_issue: shopee-rimu-fe#13
 parent_issue: rimu#36
 repository: shopee-rimu-fe
 route: /msp
@@ -14,10 +14,10 @@ designer: Codex
 
 ## User outcome and scope
 
-An authenticated account owner can prepare one shared procurement workspace for
-all connected Shopee shops. The owner can see a canonical product and variant
+An authenticated User can prepare one shared procurement workspace for all
+connected Shopee shops. The User can see a canonical product and variant
 catalog, compare read-only marketplace observations, explicitly adopt or attach
-unmapped products, complete packaging and account inventory, maintain suppliers
+unmapped products, complete packaging and User inventory, maintain suppliers
 and supplier-SKU availability, replace one validated order-history snapshot,
 and start an auditable MSP run from either saved state or a fresh marketplace
 PULL.
@@ -28,28 +28,47 @@ availability edits. Every assumed value, unassigned SKU, failed shop, and
 supplier relationship exclusion is visible at the point where it affects the
 decision.
 
+### Superseding ownership decision (shopee-rimu-fe#13)
+
+- Reuse the existing authenticated `User` and `user_id` as the owner and tenant
+  scope. Do not create an `Account` entity, `account_id`, account selector, or
+  account-level authorization concept.
+- One User has one-to-many `Shops`. A `shop_id` identifies a marketplace
+  connection and remains source/external-association metadata; it is never the
+  owner of canonical procurement data.
+- Canonical catalog/variants, packaging, inventory, suppliers, supplier-SKU
+  constraints, order-history snapshots, PULL observations, and MSP runs are
+  shared at User scope. User-scoped pages therefore use the authenticated
+  context without a workspace selector.
+- Show a Shop selector only where marketplace context is needed: PULL scope,
+  marketplace observation/reconciliation filters, and external association
+  details. It must be labelled as an observation/source filter, not an owner
+  or tenant selector.
+- Teams, organizations, and cross-User workspaces are out of scope.
+
 ### Entry point and existing frontend anchors
 
 - Keep the authenticated `/msp` route as the first release entry point. The
   sidebar continues to expose it as `MSP Procurement`; the page may be
-  reorganized into account-level tabs without breaking the route.
+  reorganized into User-scoped tabs without breaking the route.
 - The current `/msp` workbench is shop-oriented: it loads Shopee shops through
   `getShops`, uploads four CSV files to
   `/api/msp/pipeline-runs/upload-start`, polls
   `/api/msp/pipeline-runs/:run_id`, and previews stage artifacts. This design
-  replaces repeated run-scoped configuration with account-owned state while
+  replaces repeated run-scoped configuration with User-owned state while
   retaining a compatibility path for existing run history during migration.
 - The existing `/warehouse/products` page already displays parent/model trees,
   marketplace stock, status, prices, and HPP. Its tree presentation is a useful
-  visual anchor, but the new account catalog must make canonical SKU and
-  account inventory primary; marketplace item/model IDs remain associations.
+  visual anchor, but the new User catalog must make canonical SKU and User
+  inventory primary; marketplace item/model IDs remain associations.
 - Existing shadcn primitives (`Card`, `Table`, `Badge`, `Dialog`, `Button`,
   `Input`, `Switch`, `Pagination`, `Toast`, and `Skeleton`) are the intended
   building blocks. No production UI is changed by this design PR.
 
 ### In scope
 
-1. Account selector and account-level catalog/variant information architecture.
+1. Authenticated User context and User-level catalog/variant information
+   architecture; no owner selector.
 2. Read-only Shopee PULL for every connected shop, reconciliation, and explicit
    adoption/attachment of unmapped observations.
 3. Shared packaging, on-hand inventory, selling-price visibility, and readiness
@@ -72,7 +91,7 @@ decision.
 - Tokopedia MSP execution in the first release.
 - In-app editing of individual order-history rows; replacement is a complete
   batch operation.
-- Treating marketplace stock, price, or status as canonical account state.
+- Treating marketplace stock, price, or status as canonical User state.
 - Creating an active product without complete packaging and explicit on-hand
   inventory.
 - Making completed results change when current settings change.
@@ -81,24 +100,26 @@ decision.
 
 ## User flow
 
-The flow is intentionally account-scoped. Shop selection is a scope and
-observation control, not a product or inventory owner.
+The flow is intentionally User-scoped. The authenticated session supplies
+`user_id`; there is no owner selector. Shop selection is available only as a
+marketplace scope and observation control, never as a product or inventory
+owner.
 
 | Step | User action | Visible state/result | API/data dependency |
 | --- | --- | --- | --- |
-| 1 | Open `/msp` while authenticated and choose a business account. | Account header shows account name, connected-shop count, active history version, and last PULL. If there is no account, show an onboarding empty state. | `GET /api/accounts/current` (proposed); existing session/cookie auth and `GET /api/shop/` remain compatibility inputs. |
-| 2 | Choose `Use saved app state` or `PULL first`. | The choice explains that PULL is read-only observation. `PULL first` lists every connected Shopee shop and last observation time before starting. | `GET account shops`; `POST .../marketplace-pulls` (proposed). |
+| 1 | Open `/msp` while authenticated. | User context header shows the signed-in User, connected-shop count, active history version, and last PULL. There is no User/account selector; if no connected shop exists, show a specific connection empty state. | Authenticated session/cookie supplies `user_id`; proposed `GET /api/user/context` and existing `GET /api/shop/` return the User's shops. |
+| 2 | Choose `Use saved app state` or `PULL first`; when needed, choose `All connected shops` or one Shop in the marketplace scope control. | The choice explains that PULL is read-only observation. `PULL first` lists the selected/all connected Shopee shops and last observation time before starting. | `GET /api/shop/`; `POST .../marketplace-pulls` (proposed), with optional `shop_id`/`shop_ids` scope validated against the authenticated User. |
 | 3 | Review PULL progress and reconciliation. | Per-shop progress is visible. Successful shops commit observations atomically; failed shops retain their previous observations and are marked `Degraded`. Tabs show Matched, Unmapped, SKU drift, stock/price discrepancies, and failed shops. | Pull status/report stream or polling; no canonical product, inventory, packaging, supplier, or price mutation. |
 | 4 | Attach a new external identity to an existing canonical product/variant, or select `Adopt as new`. | Stable external association is preferred; exact external SKU is a fallback only. No fuzzy suggestion is shown. Attach preserves the existing canonical SKU. Adoption previews the parent/variant tree, proposed canonical SKUs, packaging, and on-hand fields. | `POST .../catalog/associations/attach` or `POST .../catalog/adoptions/preview` and confirmed adoption (proposed). |
-| 5 | Complete adoption or catalog setup. | A new parent/variant is created only when packaging and on-hand inventory are complete. Duplicate canonical SKU returns `already_exists` or a row-level conflict; the current catalog stays unchanged. | Account catalog/adoption API; idempotency key by canonical SKU. |
+| 5 | Complete adoption or catalog setup. | A new parent/variant is created only when packaging and on-hand inventory are complete. Duplicate canonical SKU returns `already_exists` or a row-level conflict; the current catalog stays unchanged. | User-scoped catalog/adoption API; idempotency key by canonical SKU. |
 | 6 | Browse Catalog and open a parent row or variant row. | Parent rows contain child variants. Each row shows immutable canonical SKU, active state, packaging readiness, on-hand, derived on-order, and associations by shop. Variant packaging is `Inherited` or `Override`; external IDs are secondary. | `GET .../catalog`, `GET .../catalog/:product_id`. |
 | 7 | Edit packaging or on-hand inventory from a product detail panel. | Dimensions and `qty_per_box` validate before save; a variant override is complete or absent. On-hand accepts explicit zero. Derived on-order is read-only and links to open order-history rows. PULL stock differences become non-blocking warnings. | `PATCH .../catalog/:product_id/packaging`, `PUT .../inventory/:sku` (proposed); confirmed response replaces local state. |
-| 8 | Review Suppliers and supplier-SKU relationships. | Active/inactive supplier and relationship states are separate. Missing constraints are visibly `Default: unrestricted (0 to infinity)`. Missing metrics show an imputed/default badge and rule version. | `GET .../suppliers`, `GET .../supplier-sku`; account-owned state. |
+| 8 | Review Suppliers and supplier-SKU relationships. | Active/inactive supplier and relationship states are separate. Missing constraints are visibly `Default: unrestricted (0 to infinity)`. Missing metrics show an imputed/default badge and rule version. | `GET .../suppliers`, `GET .../supplier-sku`; User-owned state. |
 | 9 | Deactivate/reactivate a supplier or supplier-SKU pair from Settings or a result row. | A confirmation dialog explains future-run impact. Current history and completed results remain readable. The current result row does not change allocation; it gains `Inactive for future runs`. PULL never reactivates it. | `PATCH .../suppliers/:id` or `PATCH .../supplier-sku/:id/availability` with reason and idempotency key. |
 | 10 | Upload an order-history CSV. | The preview displays the exact nine columns, row counts, all row/field errors, open/closed semantics, excluded chronology rows, history-only diagnostics, and the current active version. No active state changes during preview. | `POST .../order-history/import/preview` (multipart, proposed); backend validates the complete file. |
 | 11 | Confirm replacement after a valid preview, or cancel/delete. | `Replace active snapshot` is disabled for any blocking error. Confirmation states the old and new versions and that all connected shops share the replacement. Cancel leaves the active version unchanged. Deleting the active snapshot blocks future normal MSP but preserves completed-run evidence. | `POST .../order-history/import/activate` with preview token and expected version; `DELETE .../order-history/active` (proposed). |
 | 12 | Start MSP and choose PULL mode if not already pulled. | Preflight checklist distinguishes blockers from warnings. Catalog SKUs without usable history require an explicit acknowledgement; they will show `supplier=UNKNOWN` and `allocation_status=not_allocated`. A degraded PULL is visible but does not require a second acknowledgement. | `POST .../msp/preflight`, then `POST .../msp/runs` with idempotency key (proposed). |
-| 13 | Watch the run, refresh, or cancel while queued/running. | Stage cards show Sales Forecasting, Order Replenishment, and Supplier Selection/SSOA. Cancel requires confirmation; completed stages remain inspectable. Polling resumes after reload. | Account-level run status/stage/artifact endpoints through `rimu-be-go`; current `/api/msp/pipeline-runs` is a compatibility seam. |
+| 13 | Watch the run, refresh, or cancel while queued/running. | Stage cards show Sales Forecasting, Order Replenishment, and Supplier Selection/SSOA. Cancel requires confirmation; completed stages remain inspectable. Polling resumes after reload. | User-level run status/stage/artifact endpoints through `rimu-be-go`; current `/api/msp/pipeline-runs` is a compatibility seam. |
 | 14 | Review the result/cart snapshot and diagnostics. | Summary cards, actionable/unassigned counts, assumptions, source rows, supplier links, and decision artifacts are shown. The snapshot remains unchanged after later settings or deactivation edits. | Immutable result/evidence payload returned by backend; artifact preview is read-only. |
 
 ### Validation, cancel, and failure branches
@@ -112,20 +133,20 @@ observation control, not a product or inventory owner.
 - A failed order-history activation is atomic: the old active snapshot/version
   remains active and the preview error list remains available for correction.
 - A failed shop PULL keeps that shop's previous observation and marks the
-  account pull degraded; successful shop observations remain usable.
+  User's pull degraded; successful shop observations remain usable.
 - A failed adoption or import row never partially overwrites an existing
   canonical product. Other independent rows may report success, already exists,
   or failure according to the backend batch result.
-- If the account has no catalog, no active history, or no connected Shopee shop,
+- If the User has no catalog, no active history, or no connected Shopee shop,
   provide a specific next action rather than a generic `No data` message.
 
 ## Information architecture
 
-### Account-level navigation
+### User-level navigation
 
 ```text
 Rimu / Procurement
-  Account selector + shop scope + freshness summary
+  Authenticated User context + marketplace Shop selector (when needed) + freshness summary
   ├─ Overview / readiness
   ├─ Catalog
   │   ├─ Canonical parent product
@@ -144,24 +165,26 @@ Rimu / Procurement
       └─ Immutable result/cart + evidence
 ```
 
-The account selector is always visible above the tabs. It must not look like a
-shop selector: the account is the owner of canonical data, while connected
-shops are shown as a scope summary and observation source. On narrow screens,
-the selector and tabs become a labelled select/sheet while preserving the same
-order.
+The authenticated User context is always visible above the tabs but is not
+selectable. There is no Account selector. A labelled Shop selector appears
+only on PULL/reconciliation and other marketplace-observation surfaces; it
+filters source observations and external associations without changing the
+User-wide catalog, inventory, suppliers, history, or runs. On narrow screens,
+the Shop selector and tabs become a labelled select/sheet while preserving the
+same order.
 
 ### Catalog and variant IA
 
 | Level | Primary identity | Required fields | Secondary evidence/actions |
 | --- | --- | --- | --- |
-| Account | `account_id` | name, business context, connected shops | active history version, last PULL, readiness |
+| User (authenticated owner/tenant) | `user_id` from session | display context, connected Shops | active history version, last PULL, readiness |
 | Canonical parent | immutable `product_id`, immutable canonical parent SKU | name/title, active state, selling-price context, packaging profile, inventory summary | external item associations, marketplace statuses/prices/stocks, PULL timestamps, deactivate/reactivate |
 | Sellable variant | immutable `variant_id`, immutable canonical variant SKU | variant label/options, resolved packaging, on-hand, derived on-order, active state | external model associations, observed marketplace SKU drift, supplier candidates |
 | Marketplace association | association ID plus `shop_id`, external item/model ID | source shop, external identity, observed SKU, observation timestamp | attach/detach state, match method, drift/discrepancy badges |
 
 Parent rows are expandable table rows; variants are indented child rows, not
 separate top-level products. A product with no variants is still a sellable
-parent row. The detail panel keeps canonical identity and account-owned values
+parent row. The detail panel keeps canonical identity and User-owned values
 above marketplace observations. Canonical SKU is never editable after creation
 in v1. Marketplace item/model IDs are never used as canonical identity.
 
@@ -172,7 +195,7 @@ search over canonical SKU/name/external SKU; there is no fuzzy matching action.
 
 ### Readiness and ownership legend
 
-- `Canonical` means account-owned and usable for future runs.
+- `Canonical` means User-owned and usable for future runs.
 - `Observed` means read-only data from a successful marketplace PULL.
 - `Inherited` means a variant resolves its parent's complete packaging profile.
 - `Default` means a visible rule or fallback, never a hidden value.
@@ -180,7 +203,7 @@ search over canonical SKU/name/external SKU; there is no fuzzy matching action.
 
 ## Packaging, inventory, and logistics contract
 
-Packaging is shared by the account and is independent of marketplace status or
+Packaging is shared by the User and is independent of marketplace status or
 observed marketplace dimensions. A parent profile may supply a default to all
 variants. A variant override must provide all four fields together:
 `length_cm`, `width_cm`, `height_cm`, and `qty_per_box`. Partial overrides are
@@ -191,8 +214,8 @@ invalid; a variant either fully overrides or inherits the parent.
 | `length_cm`, `width_cm`, `height_cm` | Finite number greater than zero; unit suffix `cm`; preserve the submitted precision in the saved value. | Missing/invalid blocks product creation and MSP readiness. |
 | `qty_per_box` | Positive integer; no zero, negative, fractional, or blank value. | Missing/invalid blocks product creation and MSP readiness. |
 | `volume_per_item_cm3` | Read-only derived value: `(length_cm * width_cm * height_cm) / qty_per_box`. | Must be positive; show formula in help text and result evidence. |
-| `selling_price_idr` | Account-owned canonical selling price per sellable SKU; marketplace price is only an observation. | Missing handling is a backend contract decision; do not silently copy marketplace price. |
-| `on_hand` | Account-owned non-negative integer; explicit `0` is valid and visible. | Required on adoption/product creation; missing saved stock for an existing product uses visible `default_zero` in a run snapshot. |
+| `selling_price_idr` | User-owned canonical selling price per sellable SKU; marketplace price is only an observation. | Missing handling is a backend contract decision; do not silently copy marketplace price. |
+| `on_hand` | User-owned non-negative integer; explicit `0` is valid and visible. | Required on adoption/product creation; missing saved stock for an existing product uses visible `default_zero` in a run snapshot. |
 | `on_order` | No manual input. Derived from open order-history rows (`qty_sampai` blank), with source rows and expected arrival. | Informational; never overwrite on-hand. |
 
 Show inventory position as `on_hand + derived on-order`, but keep the two values
@@ -201,8 +224,8 @@ on-hand. The UI should expose the two logistics legs in row details:
 
 1. supplier lead time = `forwarder_receive_date - order_date`, using completed
    observations for the supplier-SKU pair;
-2. forwarder transit = forwarder receipt to account warehouse, initially 60
-   days unless the account configures another versioned value.
+2. forwarder transit = forwarder receipt to the User's warehouse, initially 60
+   days unless the User configures another versioned value.
 
 For a first-time pending supplier-SKU pair, the initial supplier lead-time
 default is 7 days, and the expected warehouse arrival uses `7 + 60 days` when
@@ -215,12 +238,14 @@ and is flagged rather than silently closed.
 
 ### PULL behavior
 
-`PULL` is an inbound, read-only observation operation. Starting it for an
-account covers every connected Shopee shop and shows that scope before the
-request. Each shop is staged and committed only when its complete pull
-succeeds. A failed shop preserves its previous observations; successful shops
-remain current. The account report always shows `matched`, `unmapped`, `sku
-drift`, `stock discrepancy`, `price discrepancy`, and `failed shop` counts.
+`PULL` is an inbound, read-only observation operation. Starting it for the
+authenticated User covers every connected Shopee Shop by default and shows
+that scope before the request. A labelled Shop selector may narrow the
+marketplace observation scope, but it never narrows ownership of canonical
+data. Each shop is staged and committed only when its complete pull succeeds.
+A failed shop preserves its previous observations; successful shops remain
+current. The User-level report always shows `matched`, `unmapped`, `sku drift`,
+`stock discrepancy`, `price discrepancy`, and `failed shop` counts.
 
 Matching order is explicit:
 
@@ -256,7 +281,7 @@ or deactivates a canonical product.
 
 ## Supplier and supplier-SKU deactivation
 
-Supplier profiles and aliases are account-owned and shared across connected
+Supplier profiles and aliases are User-owned and shared across connected
 shops. Supplier lifecycle and supplier-SKU availability are separate controls:
 
 - An inactive supplier remains readable for history and completed results but
@@ -266,10 +291,10 @@ shops. Supplier lifecycle and supplier-SKU availability are separate controls:
   `NOT_IN_CURRENT_HISTORY` explain availability; they are not lifecycle states.
 - Replacing an order-history snapshot can mark absent pairs
   `NOT_IN_CURRENT_HISTORY`, but it never reactivates an inactive pair. Only an
-  account owner can reactivate it.
+  authenticated User can reactivate it.
 - Missing constraints mean unrestricted ordering (`min=0`, `max=infinity`) and
   must be marked `Default` in both settings and run evidence.
-- Missing supplier profile metrics may use versioned account/system defaults;
+- Missing supplier profile metrics may use versioned User/system defaults;
   display `Imputed`, the value, and rule version instead of presenting it as a
   measured supplier fact.
 
@@ -277,7 +302,7 @@ The deactivation dialog wording is:
 
 > Deactivate [supplier or supplier-SKU] for future procurement? This keeps
 > order history and completed results readable. New imports and future runs will
-> not use this supplier/relationship until an account owner reactivates it.
+> not use this supplier/relationship until the authenticated User reactivates it.
 
 For a relationship, require a reason select (`NOT_FOUND`, `NO_LONGER_SOLD`,
 `NOT_IN_CURRENT_HISTORY`, `Other`) and an optional note. For a supplier-level
@@ -288,17 +313,17 @@ the row gains an `Inactive for future runs` badge.
 
 ## Exact order-history import preview
 
-The account-facing file has exactly these nine columns, in this order. Extra,
+The User-facing file has exactly these nine columns, in this order. Extra,
 missing, or reordered columns are a blocking schema error; source-specific
-columns do not enter the account contract.
+columns do not enter the User contract.
 
 ```text
 sku_produk,sku_variasi,qty_request,qty_sampai,price_per_qty_rmb,supplier_name,item_link,order_date,forwarder_receive_date
 ```
 
-The snapshot is shared by the account and all connected shops. If the import
-source shop is known, retain it as import metadata outside these nine stage
-columns; do not create one active history per shop.
+The snapshot is shared by the User and all connected Shops. If the import
+source shop is known, retain its `shop_id` as import metadata outside these
+nine stage columns; do not create one active history per shop.
 
 ### Field-level contract
 
@@ -309,7 +334,7 @@ columns; do not create one active history per shop.
 | `qty_request` | Required finite number strictly greater than zero. | Negative, zero, blank, or malformed value is a blocking row error. |
 | `qty_sampai` | Blank or finite non-negative number. | Blank = open order and contributes derived on-order; explicit `0` = closed zero-fill; partial and over-receipt remain visible. Fill rate is capped at 100% while actual over-receipt is retained. |
 | `price_per_qty_rmb` | Required finite number strictly greater than zero. | Missing/zero/negative cost is a blocking row error. |
-| `supplier_name` | Required name or unambiguous account alias resolving to an active supplier. | Inactive, unknown, or ambiguous supplier is a blocking row error; no implicit supplier creation. |
+| `supplier_name` | Required name or unambiguous User supplier alias resolving to an active supplier. | Inactive, unknown, or ambiguous supplier is a blocking row error; no implicit supplier creation. |
 | `item_link` | Required valid HTTP(S) supplier item URL. | Link is retained for result/cart access and supplier-SKU review. |
 | `order_date` | Required valid date not later than import date. | Future or malformed date is a blocking row error. |
 | `forwarder_receive_date` | Blank or valid date not later than import date. | Blank is valid for an open order. Future/malformed is blocking; a parseable date before `order_date` excludes the affected supplier-SKU observation and reports the row. |
@@ -349,8 +374,8 @@ reported exclusion path.
 
 After a valid preview, the confirmation dialog says:
 
-> Replace active order history v17 with v18 for this account? All connected
-> Shopee shops will use v18 for future MSP runs. Completed run snapshots keep
+> Replace active order history v17 with v18 for this User? All connected Shopee
+> Shops will use v18 for future MSP runs. Completed run snapshots keep
 > their original history. This action replaces the entire active snapshot.
 
 The backend returns a preview token and expected active version. Activation
@@ -368,7 +393,7 @@ or red banner.
 
 | Check | Severity | UI copy/action |
 | --- | --- | --- |
-| Active account catalog has at least one eligible product | Blocker when empty | `Add a canonical product before starting MSP.` Link to Catalog. An empty catalog is not equivalent to a zero-stock catalog. |
+| Active User catalog has at least one eligible product | Blocker when empty | `Add a canonical product before starting MSP.` Link to Catalog. An empty catalog is not equivalent to a zero-stock catalog. |
 | Every eligible parent/variant resolves to complete packaging | Blocker | `Packaging is incomplete for N SKU(s).` List rows and link to edit. |
 | On-hand exists for every known product | Warning when using `default_zero` for an existing SKU | `N SKU(s) have no saved stock; this run will use explicit default_zero.` Show affected rows in evidence. |
 | Active order-history snapshot exists and passed validation | Blocker for normal run | `Upload and activate one complete order-history snapshot.` Link to Order history. |
@@ -377,19 +402,22 @@ or red banner.
 | Supplier and supplier-SKU availability | Warning/diagnostic | Show inactive candidates, excluded reasons, missing metrics, and manual reactivation path. |
 | Missing supplier-SKU constraint | Warning | `Default unrestricted constraint applied (min 0, max infinity).` |
 | Lead-time defaults | Warning | Show assumed supplier 7-day and forwarder 60-day legs with rule versions. |
-| PULL health | Non-blocking degraded state | `PULL completed with N failed shop(s). Previous observations were retained. MSP can continue from canonical account state.` No second acknowledgement is required. |
+| PULL health | Non-blocking degraded state | `PULL completed with N failed shop(s). Previous observations were retained. MSP can continue from canonical User state.` No second acknowledgement is required. |
 
 When all checks pass without unassigned SKUs, the owner can start directly.
 When a confirmation is required, the primary action reads `Acknowledge and
 start MSP`; it is disabled until the acknowledgement checkbox is checked.
-The start summary always shows account, shop scope, saved/PULL mode, active
-history version, assumption count, and unresolved diagnostics.
+The start summary always shows the authenticated User context, selected Shop
+scope when PULL is involved, saved/PULL mode, active history version,
+assumption count, and unresolved diagnostics. The Shop scope is never a
+catalog, inventory, supplier, history, or run ownership boundary.
 
 ### Run and result/cart snapshot
 
-The run header shows `run_id`, account, created/updated timestamps, mode,
-history version, configuration snapshot version, PULL timestamp, and overall
-status. Stage cards retain the current repository's three-stage order:
+The run header shows `run_id`, authenticated User context, created/updated
+timestamps, mode, history version, configuration snapshot version, PULL
+timestamp, and overall status. Stage cards retain the current repository's
+three-stage order:
 
 1. Sales Forecasting
 2. Order Replenishment
@@ -425,12 +453,12 @@ authenticated backend and must not expose shared-volume paths.
 
 ```text
 +--------------------------------------------------------------------------------+
-| Rimu / Procurement     Account: Rimu Bags v     Shops: 2 connected   [PULL]   |
+| Rimu / Procurement     Signed-in User: Rimu Bags   Shop scope: All connected v [PULL] |
 | Last PULL: 07 Sep 2026 20:10   History: v17 active   Readiness: 3 warnings  |
 +--------------------------------------------------------------------------------+
 | Overview | Catalog | Inventory & packaging | Suppliers | Order history | MSP  |
 +--------------------------------------------------------------------------------+
-| [warning] PULL observations are read-only. Canonical account data is primary. |
+| [warning] PULL observations are read-only. Canonical User data is primary.  |
 |                                                                                |
 | Catalog                                  [Search] [Status v] [Readiness v]     |
 | + Product / variant | Canonical SKU | Packaging | On hand | On order | Shops + |
@@ -443,7 +471,7 @@ authenticated backend and must not expose shared-volume paths.
 +--------------------------------------------------------------------------------+
 ```
 
-Canonical product, readiness, and account inventory are primary. Marketplace
+Canonical product, readiness, and User inventory are primary. Marketplace
 observations, warnings, assumptions, diagnostics, and irreversible actions are
 secondary but remain adjacent to the value they qualify.
 
@@ -481,7 +509,7 @@ secondary but remain adjacent to the value they qualify.
 
 ```text
 +------------------------------- Start MSP -------------------------------------+
-| Account: Rimu Bags     Mode: [PULL first v]     History: v18                    |
+| User: Rimu Bags (authenticated)   Shop scope: All connected v   Mode: [PULL first v]   History: v18 |
 | [x] Catalog ready                 [warning] 3 SKUs use default_zero             |
 | [x] Packaging complete            [warning] 1 supplier-SKU inactive             |
 | [x] Order history valid            [warning] 2 SKUs have no history             |
@@ -505,7 +533,7 @@ secondary but remain adjacent to the value they qualify.
 - Planned variants for a later static HTML artifact are `?variant=catalog`,
   `?variant=pull-degraded`, `?variant=history-invalid`, and
   `?variant=preflight-unassigned`. Each variant uses in-memory fixtures only.
-- Fixture state: account `Rimu Bags`, two connected Shopee shops (one degraded),
+- Fixture state: authenticated User `Rimu Bags`, two connected Shopee shops (one degraded),
   two canonical parents with three variants, one unmapped observation, one
   external-SKU drift, one active and one inactive supplier-SKU pair, active
   history v17, and one unassigned catalog SKU.
@@ -514,7 +542,7 @@ secondary but remain adjacent to the value they qualify.
 - Proposed local review command when a static artifact is produced:
   `npx serve docs/prototypes` and open the generated artifact at the localhost
   URL. Do not publish it as an implementation surface.
-- Review question: Is the account-vs-shop ownership hierarchy obvious, and do
+- Review question: Is the User-vs-Shop ownership hierarchy obvious, and do
   the PULL degradation, unknown supplier, inherited packaging, and immutable
   result cues appear before the primary action?
 
@@ -522,9 +550,10 @@ secondary but remain adjacent to the value they qualify.
 
 ### Keyboard, focus, and dialogs
 
-- Use semantic landmarks: one `main`, a labelled account selector, tablist with
+- Use semantic landmarks: one `main`, a non-interactive authenticated User
+  context plus a labelled marketplace Shop selector when present, and a tablist with
   associated tabpanels, headings in hierarchy, and table captions/labels.
-- Focus order follows account selector -> PULL mode -> tabs -> filters -> table
+- Focus order follows Shop selector (when present) -> PULL mode -> tabs -> filters -> table
   actions -> detail panel. Parent expand/collapse is keyboard-operable and
   announces `expanded`/`collapsed`.
 - Use shadcn/Radix `Dialog` for adoption, history replacement/deletion,
@@ -561,7 +590,7 @@ secondary but remain adjacent to the value they qualify.
 
 - Desktop: two-column workspace where the left side is the primary catalog/form
   and the right side is readiness, PULL health, or run history.
-- Tablet: stack panels while keeping account summary sticky.
+- Tablet: stack panels while keeping the authenticated User summary sticky.
 - Mobile: convert wide tables to labelled cards or a horizontally scrollable
   table, keep canonical SKU and status in the first visible columns, and move
   secondary actions into a keyboard-accessible `DropdownMenu`.
@@ -572,7 +601,7 @@ secondary but remain adjacent to the value they qualify.
 
 | Surface | Loading | Empty | Degraded | Error/failure | Recovery and preserved state |
 | --- | --- | --- | --- | --- | --- |
-| Account/shops | Skeleton account header and shop rows; disable PULL/start. | `Connect or select a business account before procurement.` | A shop chip reports stale observation time. | 401 redirects to login; 403 explains account access; 5xx offers Retry. | Keep selected account and active tab; retry only the failed GET. |
+| User context/shops | Skeleton User context and Shop rows; disable PULL/start. | `Connect a Shopee Shop before procurement.` | A Shop chip reports stale observation time; the User-owned surfaces remain available. | 401 redirects to login; 403 explains User access; 5xx offers Retry. | Keep active tab and marketplace Shop filter; retry only the failed GET. |
 | Catalog | Table skeleton with parent/variant row shape. | No canonical products: `Add a product or adopt an observation; PULL alone does not create catalog state.` | Stale/failed shop observations are badges on association rows, never canonical status. | Conflict on attach/adopt lists the exact SKU and leaves existing row untouched. | Return to reconciliation or edit form; never clear catalog. |
 | PULL | Per-shop progress, count, and last successful observation. | No connected Shopee shops: disable PULL and explain Home connection action. | One or more shops failed; previous observations retained; MSP may continue from saved canonical state. | Retry failed shop/report; no automatic duplicate PULL; no canonical writes. | Preserve successful shop results and selected reconciliation tab. |
 | Adoption | Preview skeleton and disabled confirm. | No unmapped observations: show `All pulled identities are matched.` | Observation incomplete/stale: block adoption until complete response is available. | Duplicate/conflict or invalid packaging/inventory is row-level and actionable. | Keep entered canonical SKU and packaging draft. |
