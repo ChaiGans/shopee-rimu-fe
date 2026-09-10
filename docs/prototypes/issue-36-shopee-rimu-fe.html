@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RIMU Procurement Workspace — Interactive Design Prototype</title>
+  <style>
+    :root {
+      --ink: #14231d;
+      --muted: #68756f;
+      --line: #dbe4df;
+      --soft: #f3f7f4;
+      --paper: #ffffff;
+      --brand: #176b4d;
+      --brand-2: #d9f5e8;
+      --warn: #9a5a08;
+      --warn-bg: #fff4d8;
+      --danger: #a8342f;
+      --danger-bg: #fff0ee;
+      --info: #225ea8;
+      --info-bg: #edf5ff;
+      --shadow: 0 12px 35px rgba(18, 44, 33, .10);
+      --radius: 16px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: #eef3ef;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(30, 126, 89, .28); outline-offset: 2px; }
+    .prototype-banner { position: sticky; top: 0; z-index: 30; padding: 7px 16px; color: #f7fff9; background: #14231d; text-align: center; font-size: 12px; letter-spacing: .09em; text-transform: uppercase; }
+    .shell { min-height: calc(100vh - 30px); display: grid; grid-template-columns: 230px 1fr; }
+    .sidebar { padding: 24px 16px 90px; color: #eaf6ef; background: linear-gradient(180deg, #173a2d, #10251d); }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 28px; font-weight: 800; font-size: 19px; }
+    .brand-mark { display: grid; place-items: center; width: 33px; height: 33px; border-radius: 10px; color: #173a2d; background: #a7edc9; }
+    .context { padding: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(255,255,255,.07); }
+    .eyebrow { margin: 0 0 5px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .sidebar .eyebrow { color: #a7c6b8; }
+    .context strong { display: block; font-size: 14px; }
+    .context small { color: #b7d0c5; }
+    .nav { display: grid; gap: 6px; margin-top: 22px; }
+    .nav button { width: 100%; padding: 11px 12px; border: 0; border-radius: 10px; color: #bcd0c6; background: transparent; text-align: left; }
+    .nav button:hover, .nav button.active { color: white; background: rgba(167, 237, 201, .15); }
+    .nav button.active { box-shadow: inset 3px 0 #82dbae; }
+    .main { min-width: 0; padding: 24px 28px 105px; }
+    .topbar { display: flex; gap: 18px; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+    h1 { margin: 2px 0 5px; font-size: clamp(25px, 3vw, 36px); letter-spacing: -.035em; }
+    h2 { margin: 0; font-size: 20px; }
+    h3 { margin: 0 0 8px; font-size: 15px; }
+    p { line-height: 1.5; }
+    .lede { margin: 0; color: var(--muted); font-size: 14px; }
+    .shop-picker { min-width: 230px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--paper); box-shadow: 0 5px 18px rgba(25,45,36,.05); }
+    .shop-picker select { width: 100%; border: 0; color: var(--ink); background: transparent; font-weight: 700; }
+    .scenario-bar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 14px; }
+    .scenario-bar button { flex: 0 0 auto; padding: 9px 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--paper); }
+    .scenario-bar button.active { color: white; border-color: var(--brand); background: var(--brand); }
+    .workspace { display: grid; gap: 16px; }
+    .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); box-shadow: 0 5px 18px rgba(25,45,36,.045); }
+    .card-head { display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+    .card-body { padding: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .span-8 { grid-column: span 8; }
+    .span-7 { grid-column: span 7; }
+    .span-6 { grid-column: span 6; }
+    .span-5 { grid-column: span 5; }
+    .span-4 { grid-column: span 4; }
+    .metric { padding: 17px; }
+    .metric b { display: block; margin-top: 5px; font-size: 25px; }
+    .metric small { color: var(--muted); }
+    .btn { border: 1px solid var(--line); border-radius: 10px; padding: 9px 13px; color: var(--ink); background: var(--paper); font-weight: 700; }
+    .btn:hover { border-color: #9db8aa; background: #f8fbf9; }
+    .btn.primary { color: white; border-color: var(--brand); background: var(--brand); }
+    .btn.danger { color: var(--danger); border-color: #edbbb7; background: var(--danger-bg); }
+    .btn:disabled { cursor: not-allowed; opacity: .45; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; width: fit-content; padding: 4px 8px; border-radius: 999px; color: #315246; background: var(--brand-2); font-size: 11px; font-weight: 800; }
+    .badge.warn { color: var(--warn); background: var(--warn-bg); }
+    .badge.danger { color: var(--danger); background: var(--danger-bg); }
+    .badge.info { color: var(--info); background: var(--info-bg); }
+    .badge.neutral { color: #57625e; background: #edf1ef; }
+    .alert { display: flex; gap: 11px; padding: 13px 14px; border: 1px solid #f0d495; border-radius: 12px; color: #70490f; background: var(--warn-bg); font-size: 13px; }
+    .alert.danger { color: #7e2925; border-color: #efbbb7; background: var(--danger-bg); }
+    .alert.info { color: #174979; border-color: #c6dcf4; background: var(--info-bg); }
+    .alert + .alert { margin-top: 9px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { padding: 10px 12px; color: var(--muted); background: #f7faf8; text-align: left; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+    td { padding: 13px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+    tr:hover td { background: #fbfdfc; }
+    .tree strong { display: block; }
+    .tree small { color: var(--muted); }
+    .indent { padding-left: 28px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    .muted { color: var(--muted); }
+    .split { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; }
+    .detail { position: sticky; top: 62px; align-self: start; }
+    .kv { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .kv:last-child { border-bottom: 0; }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 16px; }
+    .step { padding: 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); background: var(--paper); }
+    .step b { display: block; margin-bottom: 3px; color: var(--ink); }
+    .step.active { border-color: #75c69f; background: #e9f9f1; }
+    .step.done::before { content: "✓ "; color: var(--brand); font-weight: 900; }
+    .flow { display: flex; align-items: stretch; gap: 8px; overflow-x: auto; }
+    .flow-node { min-width: 135px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); font-size: 12px; }
+    .flow-node strong { display: block; margin-bottom: 4px; }
+    .flow-arrow { display: grid; place-items: center; color: #8ba097; }
+    .check { display: flex; gap: 9px; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: #fbfdfc; }
+    .check input { margin-top: 3px; }
+    .stage-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+    .stage-row:last-child { border-bottom: 0; }
+    .log { max-height: 180px; overflow: auto; padding: 13px; border-radius: 12px; color: #cfe7db; background: #14231d; font: 11px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .log div::before { content: "> "; color: #72d7a5; }
+    .variant-switcher { position: fixed; z-index: 50; left: 50%; bottom: 18px; display: flex; align-items: center; gap: 8px; transform: translateX(-50%); padding: 8px; border: 1px solid rgba(255,255,255,.14); border-radius: 16px; color: white; background: rgba(20,35,29,.96); box-shadow: var(--shadow); backdrop-filter: blur(12px); }
+    .variant-switcher button { min-width: 38px; height: 36px; border: 0; border-radius: 9px; color: white; background: rgba(255,255,255,.08); }
+    .variant-switcher button:hover { background: rgba(255,255,255,.18); }
+    .variant-copy { min-width: 180px; text-align: center; }
+    .variant-copy small { display: block; color: #9fb8ac; }
+    dialog { width: min(560px, calc(100% - 30px)); padding: 0; border: 0; border-radius: 18px; box-shadow: 0 30px 90px rgba(0,0,0,.28); }
+    dialog::backdrop { background: rgba(8, 22, 16, .58); backdrop-filter: blur(3px); }
+    .modal-head, .modal-foot { padding: 18px 20px; }
+    .modal-head { border-bottom: 1px solid var(--line); }
+    .modal-body { padding: 20px; }
+    .modal-foot { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); background: #f8faf9; }
+    label { display: grid; gap: 6px; margin-bottom: 13px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    input, select { padding: 10px 11px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: white; }
+    .hidden { display: none !important; }
+
+    /* Three deliberately different review concepts. */
+    body.variant-b { --brand: #244e8a; --brand-2: #e6effb; --soft: #f4f6fa; background: #e9edf3; }
+    body.variant-b .shell { grid-template-columns: 74px 1fr; }
+    body.variant-b .sidebar { padding-inline: 10px; background: #172131; }
+    body.variant-b .brand { justify-content: center; padding-inline: 0; }
+    body.variant-b .brand span:last-child, body.variant-b .context, body.variant-b .nav button span { display: none; }
+    body.variant-b .nav button { text-align: center; font-size: 19px; }
+    body.variant-b .main { padding-top: 16px; }
+    body.variant-b .workspace { gap: 10px; }
+    body.variant-b .card { border-radius: 7px; box-shadow: none; }
+    body.variant-b .card-head, body.variant-b .card-body { padding: 14px; }
+    body.variant-b .metric { border-radius: 7px; }
+    body.variant-b td { padding-block: 9px; }
+
+    body.variant-c { --brand: #7c4127; --brand-2: #f7e8df; --soft: #faf6f2; background: #eee9e3; }
+    body.variant-c .shell { grid-template-columns: 1fr; }
+    body.variant-c .sidebar { position: sticky; top: 30px; z-index: 20; display: flex; align-items: center; gap: 14px; padding: 10px 24px; background: #2d2724; }
+    body.variant-c .brand { padding: 0 18px 0 0; }
+    body.variant-c .brand-mark { color: #2d2724; background: #f0c7ac; }
+    body.variant-c .context { margin-left: auto; padding: 7px 11px; }
+    body.variant-c .context .eyebrow, body.variant-c .context small { display: none; }
+    body.variant-c .nav { display: flex; order: -1; margin: 0; }
+    body.variant-c .nav button { width: auto; padding: 9px 11px; }
+    body.variant-c .main { max-width: 1500px; width: 100%; margin: auto; }
+    body.variant-c .workspace { grid-template-columns: minmax(0, 1fr) 310px; align-items: start; }
+    body.variant-c #screen { min-width: 0; }
+    body.variant-c #inspector { position: sticky; top: 105px; }
+    body.variant-c .card { border-radius: 4px; box-shadow: 4px 4px 0 rgba(45,39,36,.08); }
+
+    @media (max-width: 900px) {
+      .shell, body.variant-b .shell { grid-template-columns: 1fr; }
+      .sidebar, body.variant-b .sidebar { position: static; display: flex; align-items: center; gap: 10px; padding: 11px 14px; }
+      .brand { padding: 0; }
+      .context { margin-left: auto; }
+      .nav { display: none; }
+      .main { padding: 18px 14px 100px; }
+      .split { grid-template-columns: 1fr; }
+      .detail { position: static; }
+      .span-4, .span-5, .span-6, .span-7, .span-8 { grid-column: span 12; }
+      .topbar { flex-direction: column; }
+      .shop-picker { width: 100%; }
+      .steps { grid-template-columns: 1fr 1fr; }
+      body.variant-c .sidebar { overflow-x: auto; padding-inline: 12px; }
+      body.variant-c .context { display: none; }
+      body.variant-c .workspace { grid-template-columns: 1fr; }
+      body.variant-c #inspector { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div class="prototype-banner">Prototype only · fake in-memory data · no API calls · no production mutations</div>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">R</span><span>RIMU</span></div>
+      <div class="context">
+        <p class="eyebrow">Signed-in user</p>
+        <strong>Rimu Bags</strong>
+        <small>Owns canonical catalog + procurement</small>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <button data-screen="catalog"><b>▦</b> <span>Catalog</span></button>
+        <button data-screen="pull"><b>↧</b> <span>Marketplace PULL</span></button>
+        <button data-screen="history"><b>◷</b> <span>Order history</span></button>
+        <button data-screen="preflight"><b>✓</b> <span>MSP preflight</span></button>
+        <button data-screen="result"><b>⌑</b> <span>Results</span></button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">User-owned procurement workspace</p>
+          <h1 id="page-title">Canonical catalog</h1>
+          <p class="lede" id="page-lede">App product data stays canonical. Shop data is an external observation.</p>
+        </div>
+        <label class="shop-picker">Marketplace observation filter
+          <select id="shop-select">
+            <option>All connected shops</option>
+            <option>Shopee · Main Shop</option>
+            <option>Shopee · Outlet Shop</option>
+          </select>
+        </label>
+      </header>
+
+      <div class="scenario-bar" aria-label="Prototype scenarios">
+        <button data-screen="catalog">1 · Catalog + adoption</button>
+        <button data-screen="pull">2 · Degraded PULL</button>
+        <button data-screen="history">3 · History import</button>
+        <button data-screen="preflight">4 · MSP preflight</button>
+        <button data-screen="result">5 · Immutable result</button>
+      </div>
+
+      <div class="workspace">
+        <section id="screen" aria-live="polite"></section>
+        <aside id="inspector" class="card">
+          <div class="card-head"><h2>Prototype state</h2><button class="btn" id="reset">Reset</button></div>
+          <div class="card-body">
+            <div id="state-summary"></div>
+            <h3 style="margin-top:16px">Action log</h3>
+            <div class="log" id="event-log" aria-live="polite"></div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <div class="variant-switcher" aria-label="Design variant switcher">
+    <button id="variant-prev" aria-label="Previous design variant">←</button>
+    <div class="variant-copy"><b id="variant-name">A · Guided workspace</b><small>Use ← → keys to compare</small></div>
+    <button id="variant-next" aria-label="Next design variant">→</button>
+  </div>
+
+  <dialog id="modal">
+    <div class="modal-head"><p class="eyebrow" id="modal-eyebrow">Review action</p><h2 id="modal-title">Title</h2></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </dialog>
+
+  <script>
+    const fixtures = {
+      screen: 'catalog',
+      selectedSku: 'BAG-001-BLK-M',
+      pullComplete: false,
+      adopted: false,
+      historyValid: false,
+      historyVersion: 17,
+      acknowledged: false,
+      runStarted: false,
+      relationshipActive: true,
+      logs: ['Fixture loaded. User Rimu Bags owns canonical data.']
+    };
+    let state = structuredClone(fixtures);
+    const variants = [
+      { id: 'A', name: 'A · Guided workspace', body: 'variant-a' },
+      { id: 'B', name: 'B · Operations console', body: 'variant-b' },
+      { id: 'C', name: 'C · Split command center', body: 'variant-c' }
+    ];
+    let variantIndex = Math.max(0, variants.findIndex(v => v.id.toLowerCase() === (new URLSearchParams(location.search).get('variant') || 'A').toLowerCase()));
+
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => [...document.querySelectorAll(selector)];
+    const badge = (text, type = '') => `<span class="badge ${type}">${text}</span>`;
+    function log(message) {
+      state.logs.unshift(message);
+      state.logs = state.logs.slice(0, 8);
+      renderInspector();
+    }
+    function setVariant(index) {
+      variantIndex = (index + variants.length) % variants.length;
+      document.body.className = variants[variantIndex].body;
+      $('#variant-name').textContent = variants[variantIndex].name;
+      const url = new URL(location.href);
+      url.searchParams.set('variant', variants[variantIndex].id);
+      history.replaceState({}, '', url);
+      render();
+    }
+    function setScreen(screen) {
+      state.screen = screen;
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function openModal({ eyebrow = 'Review action', title, body, confirm = 'Confirm', danger = false, onConfirm }) {
+      $('#modal-eyebrow').textContent = eyebrow;
+      $('#modal-title').textContent = title;
+      $('#modal-body').innerHTML = body;
+      $('#modal-foot').innerHTML = `<button class="btn" data-close>Cancel</button><button class="btn ${danger ? 'danger' : 'primary'}" data-confirm>${confirm}</button>`;
+      $('#modal').showModal();
+      $('[data-close]').onclick = () => $('#modal').close();
+      $('[data-confirm]').onclick = () => onConfirm?.();
+    }
+    function renderInspector() {
+      $('#state-summary').innerHTML = `
+        <div class="kv"><span>Ownership</span><b>User</b></div>
+        <div class="kv"><span>Active history</span><b>v${state.historyVersion}</b></div>
+        <div class="kv"><span>Pull state</span><b>${state.pullComplete ? 'Degraded' : 'Not run'}</b></div>
+        <div class="kv"><span>MSP run</span><b>${state.runStarted ? 'Succeeded' : 'Not started'}</b></div>
+        <div class="kv"><span>Supplier–SKU</span><b>${state.relationshipActive ? 'Active' : 'Inactive'}</b></div>`;
+      $('#event-log').innerHTML = state.logs.map(item => `<div>${item}</div>`).join('');
+    }
+    function layout(content, side = '') {
+      if (variants[variantIndex].id === 'A') {
+        return `<div class="steps"><div class="step ${['catalog','pull'].includes(state.screen) ? 'active' : 'done'}"><b>1 · Prepare</b>Catalog + PULL</div><div class="step ${state.screen === 'history' ? 'active' : ['preflight','result'].includes(state.screen) ? 'done' : ''}"><b>2 · Evidence</b>Order history</div><div class="step ${state.screen === 'preflight' ? 'active' : state.screen === 'result' ? 'done' : ''}"><b>3 · Check</b>MSP preflight</div><div class="step ${state.screen === 'result' ? 'active' : ''}"><b>4 · Decide</b>Result snapshot</div></div><div class="split"><div>${content}</div>${side ? `<div>${side}</div>` : ''}</div>`;
+      }
+      if (variants[variantIndex].id === 'B') {
+        return `<div class="grid"><div class="span-8">${content}</div><div class="span-4">${side || operationalRail()}</div></div>`;
+      }
+      return `${content}${side}`;
+    }
+    function operationalRail() {
+      return `<div class="card"><div class="card-head"><h2>Readiness</h2>${badge('3 checks', 'info')}</div><div class="card-body"><div class="kv"><span>Catalog</span><b>3 active</b></div><div class="kv"><span>History</span><b>v${state.historyVersion}</b></div><div class="kv"><span>Blocking</span><b>${state.screen === 'preflight' ? '1' : '0'}</b></div></div></div>`;
+    }
+
+    function catalogScreen() {
+      const content = `
+        <div class="grid" style="margin-bottom:16px">
+          <div class="card metric span-4"><small>Canonical products</small><b>${state.adopted ? 4 : 3}</b><span class="badge">User-owned</span></div>
+          <div class="card metric span-4"><small>Connected shops</small><b>2</b><span class="badge info">Observation sources</span></div>
+          <div class="card metric span-4"><small>Needs mapping</small><b>${state.adopted ? 0 : 1}</b><span class="badge warn">Review</span></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h2>Canonical product tree</h2><p class="lede">Packaging and inventory belong to user, shared across shops.</p></div><div class="actions"><button class="btn" data-adopt>Review unmapped</button><button class="btn primary" data-go-pull>Run marketplace PULL</button></div></div>
+          <div style="overflow:auto"><table><thead><tr><th>Product / variant</th><th>Packaging</th><th>On hand</th><th>Marketplace links</th><th>Status</th></tr></thead><tbody>
+            <tr><td class="tree"><strong>▾ BAG-001 · Daily Tote</strong><small>Parent profile</small></td><td>42 × 31 × 6 cm · 10/box</td><td>84</td><td>2 shops</td><td>${badge('Active')}</td></tr>
+            <tr data-select-sku="BAG-001-BLK-M"><td class="tree indent"><strong>BAG-001-BLK-M</strong><small>Black / Medium · complete override</small></td><td>41 × 30 × 6 cm · 10/box</td><td>37</td><td>Shopee Main + Outlet</td><td>${badge('Active')}</td></tr>
+            <tr data-select-sku="BAG-001-RED-M"><td class="tree indent"><strong>BAG-001-RED-M</strong><small>Red / Medium · inherits parent</small></td><td>${badge('Inherited', 'neutral')} 42 × 31 × 6</td><td>47</td><td>Shopee Main</td><td>${badge('Active')}</td></tr>
+            <tr><td class="tree"><strong>▸ BAG-002 · Travel Pouch</strong><small>1 variant</small></td><td>24 × 16 × 8 cm · 20/box</td><td>0</td><td>Shopee Main</td><td>${badge('Active')}</td></tr>
+            ${state.adopted ? `<tr><td class="tree"><strong>▸ BAG-003 · Mini Sling</strong><small>Adopted during this session</small></td><td>20 × 13 × 5 cm · 12/box</td><td>12</td><td>Shopee Outlet</td><td>${badge('Active')}</td></tr>` : ''}
+          </tbody></table></div>
+        </div>`;
+      const side = `<div class="card detail"><div class="card-head"><h2>Selected variant</h2>${badge('Canonical')}</div><div class="card-body"><h3>${state.selectedSku}</h3><p class="muted">Internal UUID <span class="mono">prd_7c13…v_blk</span></p><div class="kv"><span>Canonical SKU</span><b>${state.selectedSku}</b></div><div class="kv"><span>Volume / item</span><b>738 cm³</b></div><div class="kv"><span>Stock source</span><b>User inventory</b></div><div class="kv"><span>Shopee Main</span><b>Mapped</b></div><div class="kv"><span>Shopee Outlet</span><b>SKU drift ⚠</b></div><div class="alert info" style="margin-top:14px">Shopee SKU changed, but stable external ID still maps here. Canonical SKU remains unchanged.</div></div></div>`;
+      return layout(content, side);
+    }
+
+    function pullScreen() {
+      const content = `<div class="card"><div class="card-head"><div><h2>Marketplace PULL</h2><p class="lede">Fetch observations. Never overwrite canonical products, packaging, inventory, or manual supplier status.</p></div><button class="btn primary" data-run-pull>${state.pullComplete ? 'Run again' : 'Start PULL'}</button></div><div class="card-body">
+        <div class="flow"><div class="flow-node"><strong>Connected shops</strong>2 Shopee sources</div><div class="flow-arrow">→</div><div class="flow-node"><strong>Fetch observations</strong>Per-shop atomic</div><div class="flow-arrow">→</div><div class="flow-node"><strong>Identity match</strong>External IDs first</div><div class="flow-arrow">→</div><div class="flow-node"><strong>Owner review</strong>Adopt / attach</div></div>
+        ${state.pullComplete ? `<div style="margin-top:18px"><div class="alert">PULL completed degraded. Main Shop updated; Outlet Shop failed. Previous Outlet observations remain available.</div><table style="margin-top:14px"><thead><tr><th>Shop</th><th>Outcome</th><th>Observed</th><th>Unmapped</th><th>Saved state</th></tr></thead><tbody><tr><td>Shopee · Main Shop</td><td>${badge('Succeeded')}</td><td>3</td><td>0</td><td>New observation set</td></tr><tr><td>Shopee · Outlet Shop</td><td>${badge('Failed', 'danger')}</td><td>—</td><td>1 prior</td><td>Previous state preserved</td></tr></tbody></table></div>` : `<div class="alert info" style="margin-top:18px">PULL runs across all connected shops. One shop failure does not erase another shop's successful observations.</div>`}
+      </div></div>`;
+      const side = `<div class="card detail"><div class="card-head"><h2>Boundary</h2>${badge('PULL ≠ SYNC', 'info')}</div><div class="card-body"><div class="kv"><span>Marketplace</span><b>Observation</b></div><div class="kv"><span>Canonical app data</span><b>Unchanged</b></div><div class="kv"><span>Failed shop</span><b>Retain prior</b></div><p class="lede" style="margin-top:14px">Downstream marketplace SYNC is future scope.</p></div></div>`;
+      return layout(content, side);
+    }
+
+    function historyScreen() {
+      const content = `<div class="card"><div class="card-head"><div><h2>Import complete order-history snapshot</h2><p class="lede">Current active snapshot v${state.historyVersion}. Validate every row before replacement.</p></div><div class="actions"><button class="btn" data-history-invalid>Invalid fixture</button><button class="btn" data-history-valid>Valid fixture</button></div></div><div class="card-body">
+        ${state.historyValid ? `<div class="alert info">Preview v18 valid: 4 rows. Blank <span class="mono">qty_sampai</span> means open order; zero means closed zero-fill.</div>` : `<div class="alert danger">Snapshot rejected: 3 field errors. Active v${state.historyVersion} remains unchanged.</div>`}
+        <div style="overflow:auto;margin-top:14px"><table><thead><tr><th>sku_produk</th><th>sku_variasi</th><th>qty_request</th><th>qty_sampai</th><th>price_per_qty_rmb</th><th>supplier_name</th><th>item_link</th><th>order_date</th><th>forwarder_receive_date</th></tr></thead><tbody>
+          <tr><td>BAG-001</td><td>BLK-M</td><td>50</td><td></td><td>18.5</td><td>Supplier A</td><td class="mono">1688.com/item/01</td><td>2026-07-01</td><td></td></tr>
+          <tr><td>BAG-001</td><td>RED-M</td><td>40</td><td>0</td><td>19</td><td>Supplier A</td><td class="mono">1688.com/item/02</td><td>2026-06-01</td><td>2026-06-08</td></tr>
+          <tr><td>BAG-002</td><td>L</td><td>30</td><td>24</td><td>${state.historyValid ? '12.2' : '<span style="color:var(--danger)">missing</span>'}</td><td>Supplier B</td><td class="mono">1688.com/item/03</td><td>2026-05-02</td><td>${state.historyValid ? '2026-05-10' : '<span style="color:var(--danger)">2027-01-01</span>'}</td></tr>
+        </tbody></table></div>
+        ${state.historyValid ? `<div class="actions" style="justify-content:flex-end;margin-top:16px"><button class="btn primary" data-activate-history>Replace v${state.historyVersion} with v18</button></div>` : `<div class="alert danger" style="margin-top:14px"><b>Row 3:</b> price required and positive; forwarder receipt cannot be future. Replacement disabled.</div>`}
+      </div></div>`;
+      const side = `<div class="card detail"><div class="card-head"><h2>Receipt semantics</h2></div><div class="card-body"><div class="kv"><span>Blank</span><b>Open / on-order</b></div><div class="kv"><span>0</span><b>Closed / zero-fill</b></div><div class="kv"><span>0 &lt; received &lt; request</span><b>Closed / partial</b></div><div class="kv"><span>received &gt; request</span><b>Closed / over</b></div><p class="lede" style="margin-top:14px">Forwarder receipt measures supplier handling time. Quantity received refers only to account warehouse.</p></div></div>`;
+      return layout(content, side);
+    }
+
+    function preflightScreen() {
+      const content = `<div class="card"><div class="card-head"><div><h2>MSP readiness review</h2><p class="lede">Inputs are frozen into one reproducible run snapshot.</p></div>${badge('1 warning · 0 blockers', 'warn')}</div><div class="card-body">
+        <div class="alert">1 active canonical SKU has no usable supplier history. It will remain visible as <b>UNKNOWN</b> and receive no allocation.</div>
+        <table style="margin-top:14px"><thead><tr><th>SKU</th><th>Inventory</th><th>Supplier</th><th>Constraint</th><th>Lead time</th></tr></thead><tbody>
+          <tr><td><b>BAG-001-BLK-M</b></td><td>37 · user_inventory</td><td>Supplier A</td><td>10–500</td><td>8 days observed + 60 transit</td></tr>
+          <tr><td><b>BAG-001-RED-M</b></td><td>47 · user_inventory</td><td>Supplier A</td><td>${badge('0–∞ imputed', 'info')}</td><td>7 days default + 60 transit</td></tr>
+          <tr><td><b>BAG-002-L</b></td><td>${badge('0 · default_zero', 'info')}</td><td>${badge('UNKNOWN', 'warn')}</td><td>${badge('0–∞ imputed', 'info')}</td><td>${badge('67 days assumed', 'info')}</td></tr>
+        </tbody></table>
+        <label class="check" style="margin-top:16px"><input type="checkbox" id="unknown-ack" ${state.acknowledged ? 'checked' : ''}><span><b>I understand BAG-002-L will not be allocated.</b><br><span class="muted">Supplier = UNKNOWN. No recommendation will be generated for this SKU.</span></span></label>
+        <div class="actions" style="justify-content:flex-end;margin-top:16px"><button class="btn" data-go-history>Back to evidence</button><button class="btn primary" data-start-run ${state.acknowledged ? '' : 'disabled'}>Freeze snapshot and start MSP</button></div>
+      </div></div>`;
+      const side = `<div class="card detail"><div class="card-head"><h2>Snapshot v44</h2>${badge('Preview', 'neutral')}</div><div class="card-body"><div class="kv"><span>Catalog</span><b>3 SKUs</b></div><div class="kv"><span>History</span><b>v${state.historyVersion}</b></div><div class="kv"><span>Pricing</span><b>User-owned</b></div><div class="kv"><span>Defaults</span><b>ruleset 2026.1</b></div><div class="kv"><span>Forwarder transit</span><b>60 days</b></div><div class="kv"><span>Pull timestamp</span><b>Optional evidence</b></div></div></div>`;
+      return layout(content, side);
+    }
+
+    function resultScreen() {
+      const content = `<div class="card"><div class="card-head"><div><h2>Procurement result · run_abc123</h2><p class="lede">Immutable snapshot. Later settings changes never rewrite this result.</p></div>${badge(state.runStarted ? 'Succeeded' : 'Fixture preview')}</div><div class="card-body">
+        <div class="flow"><div class="flow-node"><strong>Sales forecasting</strong>${badge('Succeeded')}</div><div class="flow-arrow">→</div><div class="flow-node"><strong>Order replenishment</strong>${badge('Succeeded')}</div><div class="flow-arrow">→</div><div class="flow-node"><strong>Supplier selection</strong>${badge('Succeeded')}</div></div>
+        <div style="overflow:auto;margin-top:16px"><table><thead><tr><th>SKU</th><th>Supplier</th><th>Order qty</th><th>Lead time</th><th>Decision</th><th>Future eligibility</th></tr></thead><tbody>
+          <tr><td><b>BAG-001-BLK-M</b></td><td>Supplier A</td><td>120</td><td>68 days</td><td>${badge('Allocated')}</td><td>${state.relationshipActive ? badge('Active') : badge('Inactive · NOT_FOUND', 'danger')}<br>${!state.relationshipActive ? '<small>Result row unchanged</small>' : ''}</td></tr>
+          <tr><td><b>BAG-001-RED-M</b></td><td>Supplier A</td><td>80</td><td>${badge('67 days assumed', 'info')}</td><td>${badge('Allocated')}</td><td>${badge('Active')}</td></tr>
+          <tr><td><b>BAG-002-L</b></td><td>${badge('UNKNOWN', 'warn')}</td><td>—</td><td>—</td><td>${badge('Not allocated', 'warn')}</td><td>—</td></tr>
+        </tbody></table></div>
+        <div class="actions" style="justify-content:space-between;margin-top:16px"><button class="btn" data-source-rows>View frozen evidence</button><button class="btn danger" data-deactivate ${state.relationshipActive ? '' : 'disabled'}>${state.relationshipActive ? 'Supplier link unavailable' : 'Inactive for future runs'}</button></div>
+      </div></div>`;
+      const side = `<div class="card detail"><div class="card-head"><h2>Snapshot evidence</h2>${badge('Frozen', 'neutral')}</div><div class="card-body"><div class="kv"><span>History batch</span><b>v${state.historyVersion}</b></div><div class="kv"><span>Packaging</span><b>Captured</b></div><div class="kv"><span>Inventory</span><b>Captured</b></div><div class="kv"><span>Supplier profiles</span><b>Captured</b></div><div class="kv"><span>Assumptions</span><b>5 marked</b></div><div class="alert info" style="margin-top:14px">Deactivation affects future candidate sets only. Quantity and supplier shown here remain unchanged.</div></div></div>`;
+      return layout(content, side);
+    }
+
+    function bindActions() {
+      $$('[data-go-pull]').forEach(el => el.onclick = () => setScreen('pull'));
+      $$('[data-go-history]').forEach(el => el.onclick = () => setScreen('history'));
+      $$('[data-select-sku]').forEach(el => el.onclick = () => { state.selectedSku = el.dataset.selectSku; log(`Selected ${state.selectedSku}.`); render(); });
+      $$('[data-adopt]').forEach(el => el.onclick = adoptionModal);
+      $$('[data-run-pull]').forEach(el => el.onclick = () => { state.pullComplete = true; log('PULL degraded: Main succeeded; Outlet failed; prior Outlet state preserved.'); render(); });
+      $$('[data-history-invalid]').forEach(el => el.onclick = () => { state.historyValid = false; log('Invalid v18 rejected. Active snapshot preserved.'); render(); });
+      $$('[data-history-valid]').forEach(el => el.onclick = () => { state.historyValid = true; log('Valid v18 preview loaded; replacement awaits confirmation.'); render(); });
+      $$('[data-activate-history]').forEach(el => el.onclick = historyModal);
+      $('#unknown-ack')?.addEventListener('change', event => { state.acknowledged = event.target.checked; log(state.acknowledged ? 'UNKNOWN allocation warning acknowledged.' : 'UNKNOWN acknowledgement removed.'); render(); });
+      $$('[data-start-run]').forEach(el => el.onclick = () => { state.runStarted = true; log('Snapshot v44 frozen. MSP stages succeeded.'); setScreen('result'); });
+      $$('[data-deactivate]').forEach(el => el.onclick = deactivateModal);
+      $$('[data-source-rows]').forEach(el => el.onclick = () => openModal({ title: 'Frozen evidence for BAG-001-BLK-M', body: '<div class="kv"><span>History row</span><b>v18 · row 1</b></div><div class="kv"><span>Packaging</span><b>41 × 30 × 6 · 10/box</b></div><div class="kv"><span>Inventory</span><b>37 units</b></div><div class="kv"><span>Supplier handling</span><b>8 days observed</b></div><div class="alert info" style="margin-top:14px">These values are embedded in run_abc123, not fetched from current settings.</div>', confirm: 'Close', onConfirm: () => $('#modal').close() }));
+    }
+    function adoptionModal() {
+      openModal({
+        eyebrow: 'Unmapped Shopee observation',
+        title: 'Attach or adopt Mini Sling',
+        body: `<div class="alert">External item <span class="mono">SP-9981 / model-4</span> has no canonical partner.</div><label style="margin-top:14px">Decision<select id="adopt-choice"><option value="new">Adopt as new canonical product</option><option value="existing">Attach to existing parent</option></select></label><label>Canonical SKU<input id="adopt-sku" value="BAG-003"></label><div class="grid"><label class="span-6">Packaging profile<input value="20 × 13 × 5 cm · 12/box"></label><label class="span-6">On-hand inventory<input type="number" value="12"></label></div><p class="lede">Shopee SKU is prefilled, but confirmation creates internal UUIDs and preserves external IDs as associations.</p>`,
+        confirm: 'Confirm adoption',
+        onConfirm: () => {
+          const sku = $('#adopt-sku').value.trim();
+          if (sku === 'BAG-001') { log('Adoption blocked: canonical SKU BAG-001 already exists.'); return; }
+          state.adopted = true;
+          $('#modal').close();
+          log('BAG-003 adopted; internal UUID and Shopee association created in memory.');
+          render();
+        }
+      });
+    }
+    function historyModal() {
+      openModal({ title: `Replace active history v${state.historyVersion}?`, body: `<div class="alert">This activates one complete validated snapshot. Existing v${state.historyVersion} stays auditable but no longer active.</div><div class="kv" style="margin-top:12px"><span>Current</span><b>v${state.historyVersion} · 38 rows</b></div><div class="kv"><span>Replacement</span><b>v18 · 4 prototype rows</b></div>`, confirm: 'Activate v18', onConfirm: () => { state.historyVersion = 18; $('#modal').close(); log('History v18 atomically activated. v17 retained for audit.'); render(); } });
+    }
+    function deactivateModal() {
+      openModal({ eyebrow: 'Future candidate setting', title: 'Mark supplier link as not found?', body: '<div class="alert danger">Supplier A will not be considered for BAG-001-BLK-M in future MSP runs. Completed run_abc123 remains unchanged.</div><label style="margin-top:14px">Deactivation reason<select><option>NOT_FOUND · listing unavailable</option><option>NO_LONGER_SOLD</option><option>OWNER_DISABLED</option></select></label><p class="lede">Reactivation is manual from supplier–SKU settings.</p>', confirm: 'Deactivate for future runs', danger: true, onConfirm: () => { state.relationshipActive = false; $('#modal').close(); log('Supplier A / BAG-001-BLK-M marked INACTIVE · NOT_FOUND for future runs.'); render(); } });
+    }
+
+    function render() {
+      const screens = {
+        catalog: ['Canonical catalog', 'App product data stays canonical. Shop data is an external observation.', catalogScreen],
+        pull: ['Marketplace PULL', 'Per-shop observations can degrade independently without overwriting app truth.', pullScreen],
+        history: ['Order-history snapshots', 'Exact nine-column import, full validation, atomic replacement.', historyScreen],
+        preflight: ['MSP preflight', 'Review blockers, warnings, and marked assumptions before freezing a run.', preflightScreen],
+        result: ['Procurement result', 'Frozen decision evidence stays unchanged when future settings change.', resultScreen]
+      };
+      const [title, lede, renderer] = screens[state.screen];
+      $('#page-title').textContent = title;
+      $('#page-lede').textContent = lede;
+      $('#screen').innerHTML = renderer();
+      $$('[data-screen]').forEach(el => el.classList.toggle('active', el.dataset.screen === state.screen));
+      bindActions();
+      renderInspector();
+    }
+
+    $$('[data-screen]').forEach(el => el.onclick = () => setScreen(el.dataset.screen));
+    $('#variant-prev').onclick = () => setVariant(variantIndex - 1);
+    $('#variant-next').onclick = () => setVariant(variantIndex + 1);
+    $('#reset').onclick = () => { state = structuredClone(fixtures); log('Fixture reset.'); render(); };
+    $('#shop-select').onchange = event => log(`Observation filter changed: ${event.target.value}. Ownership remains User.`);
+    document.addEventListener('keydown', event => {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if (event.key === 'ArrowLeft') setVariant(variantIndex - 1);
+      if (event.key === 'ArrowRight') setVariant(variantIndex + 1);
+    });
+    setVariant(variantIndex);
+  </script>
+</body>
+</html>

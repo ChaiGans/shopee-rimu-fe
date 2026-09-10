@@ -527,21 +527,22 @@ secondary but remain adjacent to the value they qualify.
 
 ## Clickable prototype
 
-- URL/artifact: [offline throwaway prototype storyboard](../prototypes/issue-36-shopee-rimu-fe.md). A published browser artifact is intentionally
-  not created in this docs-only, offline design wave; the linked storyboard is
-  the review handoff and is not production code.
-- Planned variants for a later static HTML artifact are `?variant=catalog`,
-  `?variant=pull-degraded`, `?variant=history-invalid`, and
-  `?variant=preflight-unassigned`. Each variant uses in-memory fixtures only.
+- URL/artifact: [interactive offline HTML playground](../prototypes/issue-36-shopee-rimu-fe.html),
+  with a supporting [scenario storyboard](../prototypes/issue-36-shopee-rimu-fe.md).
+  The HTML file is the primary UI review handoff and is not production code.
+- Its three design directions are `?variant=A` (guided workspace), `?variant=B`
+  (operations console), and `?variant=C` (split command center). Each variant
+  exposes catalog/adoption, degraded PULL, history import, MSP preflight, and
+  immutable result scenarios using in-memory fixtures only.
 - Fixture state: authenticated User `Rimu Bags`, two connected Shopee shops (one degraded),
   two canonical parents with three variants, one unmapped observation, one
   external-SKU drift, one active and one inactive supplier-SKU pair, active
   history v17, and one unassigned catalog SKU.
 - Mutations: none. Prototype controls only change in-memory panels, tabs, and
   dialogs; they must not call `rimu-be-go`, Shopee, or MSP services.
-- Proposed local review command when a static artifact is produced:
-  `npx serve docs/prototypes` and open the generated artifact at the localhost
-  URL. Do not publish it as an implementation surface.
+- Local review command: `npx serve docs/prototypes`, then open
+  `issue-36-shopee-rimu-fe.html` at the localhost URL. Opening the HTML file
+  directly also works. Do not publish it as an implementation surface.
 - Review question: Is the User-vs-Shop ownership hierarchy obvious, and do
   the PULL degradation, unknown supplier, inherited packaging, and immutable
   result cues appear before the primary action?
@@ -809,8 +810,11 @@ pass by live-looking up current settings.
   Result/cart in the first implementation slice.
 - Confirm result/cart snapshot fields and the `UNKNOWN`/
   `not_allocated` rendering contract with `rimu-msp`.
-- Review the [throwaway prototype storyboard](../prototypes/issue-36-shopee-rimu-fe.md)
-  and decide whether the User-vs-Shop hierarchy and warnings are scannable.
+- Review the [interactive HTML playground](../prototypes/issue-36-shopee-rimu-fe.html)
+  and decide which variant best communicates User-vs-Shop hierarchy, warnings,
+  and the end-to-end procurement flow. The
+  [scenario storyboard](../prototypes/issue-36-shopee-rimu-fe.md) remains a
+  compact reference.
 
 Do not implement production UI until the owner replies with `DESIGN APPROVED`
 or equivalent. Any behavior change must revise the user flow, wireframe,

@@ -1,24 +1,27 @@
 # Throwaway prototype storyboard: User-scoped canonical procurement
 
+**Interactive review artifact:** open
+[`issue-36-shopee-rimu-fe.html`](issue-36-shopee-rimu-fe.html) in a browser.
+Use its bottom switcher or `?variant=A`, `?variant=B`, and `?variant=C` to compare
+three interactive design directions. This Markdown file remains supporting
+scenario documentation, not the primary UI review artifact.
+
 Status: review-only, offline, and non-mutating. This is the local storyboard
 linked by the UI design review; it is not production UI and does not call
 `rimu-be-go`, Shopee, the MSP controller, or any other service.
 
 ## Review variants
 
-The eventual static prototype should expose the same fixture through these
-review variants:
+The interactive static prototype exposes the shared fixture through three
+design variants and five clickable scenario screens:
 
-- `?variant=catalog`: authenticated User context, parent/variant tree, detail
-  drawer, and inherited packaging.
-- `?variant=pull-degraded`: successful main shop, failed outlet shop, retained
-  prior observations, and reconciliation tabs.
-- `?variant=history-invalid`: exact nine-column preview with row/field errors,
-  open-versus-zero receipt states, and disabled activation.
-- `?variant=preflight-unassigned`: warnings, assumptions, UNKNOWN rows, and the
-  required acknowledgement before start.
-- `?variant=result`: immutable result/cart snapshot with a future-only supplier
-  deactivation dialog.
+- `?variant=A`: guided stepper workspace.
+- `?variant=B`: dense operations console.
+- `?variant=C`: split command center with persistent readiness state.
+
+Each variant lets the reviewer navigate catalog and adoption, degraded PULL,
+history import, MSP preflight, and immutable result behavior. All actions remain
+in browser memory and reset on reload.
 
 ## Shared fixture
 
