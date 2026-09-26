@@ -38,7 +38,7 @@ export async function run(page) {
   try {
     await usernameInput.waitFor({ state: "visible", timeout: 5_000 });
     await usernameInput.fill(username);
-    await page.getByLabel("Password", { exact: true }).fill(password);
+    await page.locator('input[type="password"]').fill(password);
     await page.getByRole("button", { name: "Login", exact: true }).click();
   } catch {
     // AuthProvider may already have an authenticated session.
